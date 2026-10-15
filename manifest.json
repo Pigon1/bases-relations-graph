@@ -1,0 +1,9 @@
+{
+	"id": "bases-graph",
+	"name": "Bases Graph",
+	"version": "0.1.0",
+	"minAppVersion": "1.10.0",
+	"description": "Graph view for Bases: nodes and links styled by rule tables, links from notes or connector notes.",
+	"author": "oleksandr",
+	"isDesktopOnly": false
+}

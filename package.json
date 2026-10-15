@@ -1,0 +1,23 @@
+{
+	"name": "obsidian-bases-graph",
+	"version": "0.1.0",
+	"description": "Graph view for Obsidian Bases with rule tables for nodes and links",
+	"main": "main.js",
+	"private": true,
+	"scripts": {
+		"dev": "node esbuild.config.mjs --watch --deploy",
+		"build": "tsc --noEmit && node esbuild.config.mjs --production",
+		"deploy": "node esbuild.config.mjs --production --deploy",
+		"typecheck": "tsc --noEmit"
+	},
+	"devDependencies": {
+		"@types/d3-force": "^3.0.10",
+		"esbuild": "0.17.15",
+		"obsidian": "1.14.4",
+		"typescript": "~5.9.0"
+	},
+	"dependencies": {
+		"d3-force": "^3.0.0",
+		"pixi.js": "~8.22.0"
+	}
+}

@@ -1,0 +1,239 @@
+.bases-graph {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	min-height: 300px;
+}
+
+.bases-graph-toolbar {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-2);
+	padding: var(--size-4-1) var(--size-4-2);
+	border-bottom: var(--border-width) solid var(--background-modifier-border);
+	flex-wrap: wrap;
+}
+
+.bases-graph-segmented {
+	display: flex;
+	border: var(--border-width) solid var(--background-modifier-border);
+	border-radius: var(--radius-s);
+	overflow: hidden;
+}
+
+.bases-graph-seg {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-1);
+	border-radius: 0;
+	box-shadow: none;
+	background: transparent;
+	font-size: var(--font-ui-small);
+}
+
+.bases-graph-seg .svg-icon {
+	width: var(--icon-s);
+	height: var(--icon-s);
+}
+
+.bases-graph-seg.is-active {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.bases-graph-status {
+	flex: 1;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	text-align: right;
+}
+
+.bases-graph-canvas-host {
+	flex: 1;
+	position: relative;
+	overflow: hidden;
+	min-height: 0;
+}
+
+.bases-graph-canvas {
+	position: absolute;
+	inset: 0;
+	display: block;
+}
+
+.bases-graph-tables {
+	flex: 1;
+	overflow: auto;
+	padding: var(--size-4-2);
+}
+
+.bases-graph-hint {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	margin-bottom: var(--size-4-2);
+}
+
+.bases-graph-table-scroll {
+	overflow-x: auto;
+}
+
+.bases-graph-table {
+	border-collapse: collapse;
+	font-size: var(--font-ui-small);
+	width: max-content;
+}
+
+.bases-graph-table th {
+	text-align: left;
+	font-weight: var(--font-semibold);
+	color: var(--text-muted);
+	padding: var(--size-4-1) var(--size-4-2);
+	border-bottom: var(--border-width) solid var(--background-modifier-border);
+	white-space: nowrap;
+}
+
+.bases-graph-table td {
+	padding: var(--size-4-1) var(--size-4-2);
+	border-bottom: var(--border-width) solid var(--background-modifier-border);
+	vertical-align: middle;
+}
+
+.bases-graph-table tr.has-error .bases-graph-name {
+	border-color: var(--text-error);
+}
+
+.bases-graph-order {
+	white-space: nowrap;
+}
+
+.bases-graph-order span {
+	display: inline-block;
+	min-width: 1.5em;
+	color: var(--text-muted);
+}
+
+.bases-graph-name {
+	width: 9em;
+}
+
+.bases-graph-num {
+	width: 5em;
+}
+
+.bases-graph-label-text {
+	width: 8em;
+	margin-left: var(--size-4-1);
+}
+
+.bases-graph-color {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-1);
+}
+
+.bases-graph-color input[type="range"] {
+	width: 5em;
+}
+
+.bases-graph-cond-btn {
+	max-width: 18em;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-family: var(--font-monospace);
+	font-size: var(--font-ui-smaller);
+}
+
+.bases-graph-add {
+	margin-top: var(--size-4-2);
+}
+
+/* Редактор умов */
+
+.bases-graph-condition-modal {
+	width: min(760px, 95vw);
+}
+
+.bases-graph-cond-group {
+	border-left: 2px solid var(--background-modifier-border);
+	padding-left: var(--size-4-2);
+	margin: var(--size-4-1) 0;
+}
+
+.bases-graph-cond-head,
+.bases-graph-cond-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--size-4-1);
+	align-items: center;
+	margin: var(--size-4-1) 0;
+}
+
+.bases-graph-cond-value {
+	flex: 1;
+	min-width: 8em;
+}
+
+.bases-graph-cond-raw {
+	flex: 1;
+	min-width: 14em;
+	font-family: var(--font-monospace);
+}
+
+.bases-graph-condition-error {
+	color: var(--text-error);
+	font-size: var(--font-ui-smaller);
+	min-height: 1.2em;
+	margin: var(--size-4-2) 0;
+}
+
+.is-mobile .bases-graph-seg span:not(.svg-icon):not(:has(svg)) {
+	display: none;
+}
+
+/* Вибір з іконками */
+
+.bases-graph-picker {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--size-4-1);
+	max-width: 16em;
+	font-size: var(--font-ui-small);
+}
+
+.bases-graph-picker.is-inherit {
+	color: var(--text-faint);
+}
+
+.bases-graph-picker-icon,
+.bases-graph-picker-chevron {
+	display: inline-flex;
+	color: var(--text-muted);
+}
+
+.bases-graph-picker-icon:empty {
+	display: none;
+}
+
+.bases-graph-picker-icon .svg-icon,
+.bases-graph-picker-chevron .svg-icon {
+	width: var(--icon-xs);
+	height: var(--icon-xs);
+}
+
+.bases-graph-picker-label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.bases-graph-cond-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--size-4-1);
+}
+
+.menu.bases-graph-menu {
+	max-height: 60vh;
+	overflow-y: auto;
+}
