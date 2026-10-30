@@ -82,7 +82,11 @@ export interface GraphTables {
 }
 
 /** Налаштування подання (опції Bases). */
+export type LayoutKind = "force" | "frozen";
+
 export interface GraphSettings {
+	/** force — жива фізика; frozen — фізика вимкнена, вузли стоять, де їх поставили. */
+	layout: LayoutKind;
 	centerStrength: number;
 	repelStrength: number;
 	linkStrength: number;
@@ -94,6 +98,7 @@ export interface GraphSettings {
 }
 
 export const DEFAULT_SETTINGS: GraphSettings = {
+	layout: "force",
 	centerStrength: 0.52,
 	repelStrength: 10,
 	linkStrength: 1,

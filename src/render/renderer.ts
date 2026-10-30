@@ -38,12 +38,36 @@ class LabelSprite extends Container {
 
 export interface RendererCallbacks {
 	onNodeClick(index: number, ev: PointerEvent): void;
+	onNodeDoubleClick(index: number, ev: PointerEvent): void;
 	onNodeMenu(index: number, ev: MouseEvent | PointerEvent): void;
-	onDrag(index: number, x: number, y: number): void;
-	onDragEnd(index: number): void;
+	/** rope — перетягування з утриманим Ctrl/Cmd (у замороженому режимі — «мотузка»). */
+	onDragStart(indices: number[], rope: boolean): void;
+	/** xy: [x0, y0, x1, y1, …] — нові позиції для indices. */
+	onDrag(indices: number[], xy: number[]): void;
+	onDragEnd(indices: number[], xy: number[]): void;
+	onSelectionChange(count: number): void;
+}
+
+interface Press {
+	id: number;
+	node: number;
+	x: number;
+	y: number;
+	moved: boolean;
+	menu: boolean;
+	timer: number;
+	/** Модифікатори на момент натискання: Shift — виділення, Ctrl/Cmd — «мотузка». */
+	toggle: boolean;
+	rope: boolean;
+	/** Що робить рух: перетягування вузлів, рамка виділення чи панорамування. */
+	action: "drag" | "band" | "pan";
+	/** Перетягувані вузли та їхні зміщення від курсора. */
+	drag: { indices: number[]; offsets: number[] } | null;
 }
 
 const LONG_PRESS_MS = 550;
+/** Вікно для подвійного кліку; одиночний клік чекає стільки ж, щоб не відкрити нотатку двічі. */
+const DOUBLE_CLICK_MS = 300;
 const CLICK_SLOP = 6;
 const MIN_SCALE = 0.02;
 const MAX_SCALE = 8;
@@ -88,7 +112,16 @@ export class GraphRenderer {
 
 	// Вказівники для панорамування, перетягування й масштабування.
 	private pointers = new Map<number, { x: number; y: number }>();
-	private press: { id: number; node: number; x: number; y: number; moved: boolean; menu: boolean; timer: number } | null = null;
+	private press: Press | null = null;
+	private lastClick: { node: number; time: number } | null = null;
+	private clickTimer = 0;
+	/** Виділення — за id вузлів, щоб пережити перебудову графа. */
+	private selected = new Set<string>();
+	private selGfx = new Graphics();
+	private bandGfx = new Graphics();
+	private band: { x0: number; y0: number; x1: number; y1: number } | null = null;
+	/** Режим виділення для сенсорних екранів: дотик виділяє, а не відкриває. */
+	selectMode = false;
 	private pinch: { dist: number; scale: number; mx: number; my: number } | null = null;
 
 	labelZoom = 0.6;
@@ -114,8 +147,8 @@ export class GraphRenderer {
 		this.fontFamily = getComputedStyle(this.host).fontFamily || "sans-serif";
 		this.setTheme(theme);
 
-		this.world.addChild(this.edgeGfx, this.nodeLayer, this.edgeLabelLayer, this.labelLayer);
-		this.app.stage.addChild(this.world);
+		this.world.addChild(this.edgeGfx, this.nodeLayer, this.selGfx, this.edgeLabelLayer, this.labelLayer);
+		this.app.stage.addChild(this.world, this.bandGfx);
 		this.tx = w / 2;
 		this.ty = h / 2;
 		this.bindInput();
@@ -147,6 +180,9 @@ export class GraphRenderer {
 		this.pinned = new Uint8Array(nodes.length);
 		this.hover = -1;
 		this.gridDirty = true;
+		// Виділення лишається для вузлів, що є в новому графі.
+		const ids = new Set(nodes.map((n) => n.id));
+		for (const id of this.selected) if (!ids.has(id)) this.selected.delete(id);
 		this.hitRadii = Float32Array.from(nodes, (n) => n.radius + n.strokeWidth / 2);
 		this.adjacency = nodes.map(() => []);
 		for (const e of edges) {
@@ -286,6 +322,25 @@ export class GraphRenderer {
 				if (visible) this.placeNodeLabels(i, x, y, k);
 			}
 		}
+
+		// Виділені вузли — кільце кольором підсвічування.
+		const sel = this.selGfx;
+		sel.clear();
+		if (this.selected.size) {
+			for (let i = 0; i < nodes.length; i++) {
+				if (!this.selected.has(nodes[i].id)) continue;
+				sel.circle(pos[i * 2], pos[i * 2 + 1], this.hitRadii[i] + 4 / scale).stroke({ width: 2 / scale, color: this.colors.hl, alpha: 0.9 });
+			}
+		}
+		// Рамка виділення — у координатах екрана.
+		const bg = this.bandGfx;
+		bg.clear();
+		if (this.band) {
+			const { x0, y0, x1, y1 } = this.band;
+			bg.rect(Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0))
+				.fill({ color: this.colors.hl, alpha: 0.08 })
+				.stroke({ width: 1, color: this.colors.hl, alpha: 0.8 });
+		}
 		this.app.render();
 	}
 
@@ -398,22 +453,80 @@ export class GraphRenderer {
 		this.requestRender();
 	}
 
+	// ---------- Виділення ----------
+
+	getSelectedIndices(): number[] {
+		const out: number[] = [];
+		this.nodes.forEach((n, i) => { if (this.selected.has(n.id)) out.push(i); });
+		return out;
+	}
+
+	isSelected(i: number): boolean {
+		return !!this.nodes[i] && this.selected.has(this.nodes[i].id);
+	}
+
+	clearSelection(): void {
+		if (!this.selected.size) return;
+		this.selected.clear();
+		this.selectionChanged();
+	}
+
+	selectAll(): void {
+		for (const n of this.nodes) this.selected.add(n.id);
+		this.selectionChanged();
+	}
+
+	private toggleSelected(i: number): void {
+		const id = this.nodes[i].id;
+		if (this.selected.has(id)) this.selected.delete(id);
+		else this.selected.add(id);
+		this.selectionChanged();
+	}
+
+	private selectionChanged(): void {
+		this.cb.onSelectionChange(this.selected.size);
+		this.requestRender();
+	}
+
+	private selectInBand(): void {
+		const b = this.band!;
+		const [ax, ay] = this.toWorld(Math.min(b.x0, b.x1), Math.min(b.y0, b.y1));
+		const [bx, by] = this.toWorld(Math.max(b.x0, b.x1), Math.max(b.y0, b.y1));
+		for (let i = 0; i < this.nodes.length; i++) {
+			const x = this.pos[i * 2], y = this.pos[i * 2 + 1];
+			if (x >= ax && x <= bx && y >= ay && y <= by) this.selected.add(this.nodes[i].id);
+		}
+		this.selectionChanged();
+	}
+
+	// ---------- Введення ----------
+
 	private bindInput(): void {
 		const c = this.app.canvas;
 		c.style.touchAction = "none";
+		c.tabIndex = 0;
 
 		c.addEventListener("pointerdown", (e) => {
 			c.setPointerCapture(e.pointerId);
+			c.focus({ preventScroll: true });
 			const [x, y] = this.local(e);
 			this.pointers.set(e.pointerId, { x, y });
 			if (this.pointers.size === 2) {
 				// Другий палець — щипок, скасовує натискання.
-				if (this.press) { clearTimeout(this.press.timer); this.endDrag(); this.press = null; }
+				if (this.press) { clearTimeout(this.press.timer); this.finishPress(null); this.press = null; }
 				this.startPinch();
 				return;
 			}
 			const node = this.pick(x, y);
-			const press = { id: e.pointerId, node, x, y, moved: false, menu: false, timer: 0 };
+			const touchSelect = this.selectMode && e.pointerType !== "mouse";
+			// Shift: по вузлу — виділення окремого вузла, по порожньому місцю — рамка.
+			const toggle = e.shiftKey || touchSelect;
+			const press: Press = {
+				id: e.pointerId, node, x, y, moved: false, menu: false, timer: 0,
+				toggle, rope: e.ctrlKey || e.metaKey,
+				action: node >= 0 ? "drag" : toggle ? "band" : "pan",
+				drag: null,
+			};
 			if (node >= 0 && e.pointerType !== "mouse") {
 				press.timer = window.setTimeout(() => {
 					if (!press.moved) { press.menu = true; this.cb.onNodeMenu(node, e); }
@@ -434,14 +547,14 @@ export class GraphRenderer {
 				if (!press.moved && Math.hypot(x - press.x, y - press.y) > CLICK_SLOP) {
 					press.moved = true;
 					clearTimeout(press.timer);
+					if (press.action === "drag" && !press.menu) this.beginDrag(press);
+					if (press.action === "band") this.band = { x0: press.x, y0: press.y, x1: x, y1: y };
 				}
 				if (!press.moved || press.menu) return;
-				if (press.node >= 0) {
-					const [wx, wy] = this.toWorld(x, y);
-					this.pos[press.node * 2] = wx;
-					this.pos[press.node * 2 + 1] = wy;
-					this.gridDirty = true;
-					this.cb.onDrag(press.node, wx, wy);
+				if (press.action === "drag") this.continueDrag(press, x, y);
+				else if (press.action === "band") {
+					this.band!.x1 = x;
+					this.band!.y1 = y;
 					this.requestRender();
 				} else {
 					this.tx += x - press.x;
@@ -463,8 +576,7 @@ export class GraphRenderer {
 			clearTimeout(press.timer);
 			this.press = null;
 			if (press.menu) return;
-			if (press.node >= 0 && press.moved) this.cb.onDragEnd(press.node);
-			else if (press.node >= 0 && !press.moved && e.type === "pointerup" && e.button === 0) this.cb.onNodeClick(press.node, e);
+			this.finishPress(e.type === "pointerup" ? e : null, press);
 			if (e.pointerType !== "mouse") this.setHover(-1);
 		};
 		c.addEventListener("pointerup", up);
@@ -484,10 +596,84 @@ export class GraphRenderer {
 			const factor = Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015));
 			this.zoomAt(x, y, this.scale * factor);
 		}, { passive: false });
+
+		c.addEventListener("keydown", (e) => {
+			if (e.key === "Escape") {
+				this.clearSelection();
+				e.preventDefault();
+			} else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") {
+				this.selectAll();
+				e.preventDefault();
+			}
+		});
 	}
 
-	private endDrag(): void {
-		if (this.press && this.press.node >= 0 && this.press.moved) this.cb.onDragEnd(this.press.node);
+	/** Перетягується все виділення, якщо вузол у ньому, інакше — лише цей вузол. */
+	private beginDrag(press: Press): void {
+		if (press.toggle && !this.isSelected(press.node)) this.toggleSelected(press.node);
+		const indices = this.isSelected(press.node) ? this.getSelectedIndices() : [press.node];
+		const [wx, wy] = this.toWorld(press.x, press.y);
+		const offsets: number[] = [];
+		for (const i of indices) offsets.push(this.pos[i * 2] - wx, this.pos[i * 2 + 1] - wy);
+		press.drag = { indices, offsets };
+		this.cb.onDragStart(indices, press.rope);
+	}
+
+	private continueDrag(press: Press, x: number, y: number): void {
+		const d = press.drag;
+		if (!d) return;
+		const [wx, wy] = this.toWorld(x, y);
+		const xy: number[] = [];
+		d.indices.forEach((i, k) => {
+			const nx = wx + d.offsets[k * 2], ny = wy + d.offsets[k * 2 + 1];
+			this.pos[i * 2] = nx;
+			this.pos[i * 2 + 1] = ny;
+			xy.push(nx, ny);
+		});
+		this.gridDirty = true;
+		this.cb.onDrag(d.indices, xy);
+		this.requestRender();
+	}
+
+	/** Завершення натискання: кінець перетягування, рамки або клік (одиночний, подвійний, виділення). */
+	private finishPress(e: PointerEvent | null, press: Press | null = this.press): void {
+		if (!press) return;
+		if (press.moved) {
+			if (press.drag) {
+				const xy: number[] = [];
+				for (const i of press.drag.indices) xy.push(this.pos[i * 2], this.pos[i * 2 + 1]);
+				this.cb.onDragEnd(press.drag.indices, xy);
+			} else if (press.action === "band" && this.band) {
+				this.selectInBand();
+				this.band = null;
+				this.requestRender();
+			}
+			return;
+		}
+		if (!e || e.button !== 0) return;
+		if (press.node < 0) {
+			if (!press.toggle) this.clearSelection();
+			return;
+		}
+		if (press.toggle) {
+			this.toggleSelected(press.node);
+			return;
+		}
+		// Подвійний клік відкриває в новій вкладці; одиночний чекає, чи не буде другого.
+		const now = performance.now();
+		const node = press.node;
+		if (this.lastClick && this.lastClick.node === node && now - this.lastClick.time < DOUBLE_CLICK_MS) {
+			window.clearTimeout(this.clickTimer);
+			this.lastClick = null;
+			this.cb.onNodeDoubleClick(node, e);
+			return;
+		}
+		this.lastClick = { node, time: now };
+		window.clearTimeout(this.clickTimer);
+		this.clickTimer = window.setTimeout(() => {
+			this.lastClick = null;
+			this.cb.onNodeClick(node, e);
+		}, DOUBLE_CLICK_MS);
 	}
 
 	private startPinch(): void {
@@ -519,6 +705,7 @@ export class GraphRenderer {
 		cancelAnimationFrame(this.frame);
 		this.resizeObserver?.disconnect();
 		if (this.press) clearTimeout(this.press.timer);
+		window.clearTimeout(this.clickTimer);
 		if (this.ready) this.app.destroy(true, { children: true });
 		this.ready = false;
 	}

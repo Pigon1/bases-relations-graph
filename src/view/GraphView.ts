@@ -1,4 +1,4 @@
-import { BasesView, Keymap, Menu, setIcon, type BasesAllOptions, type QueryController } from "obsidian";
+import { BasesView, getIcon, Menu, Platform, setIcon, type BasesAllOptions, type QueryController } from "obsidian";
 import { BasesEvaluator } from "../bases/evaluator";
 import { buildGraph, type GraphModel } from "../model/build";
 import { readThemeColors } from "../model/theme";
@@ -50,6 +50,10 @@ export class GraphView extends BasesView {
 	private refreshing = false;
 	private refreshQueued = false;
 	private destroyed = false;
+	private frozen = false;
+	private ropeDrag = false;
+	private freezeBtn!: HTMLElement;
+	private reheatBtn!: HTMLElement;
 
 	constructor(private controller: QueryController, containerEl: HTMLElement, private plugin: BasesGraphPlugin) {
 		super(controller);
@@ -75,18 +79,45 @@ export class GraphView extends BasesView {
 		const fit = bar.createEl("button", { cls: "clickable-icon", attr: { "aria-label": "Fit graph" } });
 		setIcon(fit, "maximize");
 		fit.onclick = () => this.renderer.fit();
-		const reheat = bar.createEl("button", { cls: "clickable-icon", attr: { "aria-label": "Restart simulation" } });
-		setIcon(reheat, "refresh-cw");
-		reheat.onclick = () => this.sim.send({ type: "reheat" });
+		this.freezeBtn = bar.createEl("button", { cls: "clickable-icon", attr: { "aria-label": "Freeze layout" } });
+		setIcon(this.freezeBtn, "snowflake");
+		this.freezeBtn.onclick = () => this.config.set("layout", this.frozen ? "force" : "frozen");
+		this.reheatBtn = bar.createEl("button", { cls: "clickable-icon", attr: { "aria-label": "Restart simulation" } });
+		setIcon(this.reheatBtn, "refresh-cw");
+		this.reheatBtn.onclick = () => this.sim.send({ type: "reheat" });
+		if (Platform.isMobile) {
+			// На сенсорному екрані немає Ctrl/Shift — окремий режим виділення.
+			const sel = bar.createEl("button", { cls: "clickable-icon", attr: { "aria-label": "Selection mode" } });
+			// Назви іконок Lucide змінювалися між версіями — беремо першу наявну.
+			setIcon(sel, ["square-dashed-mouse-pointer", "mouse-pointer-square-dashed", "lasso-select", "pointer"].find((n) => getIcon(n)) ?? "pointer");
+			sel.onclick = () => {
+				this.renderer.selectMode = !this.renderer.selectMode;
+				sel.toggleClass("is-active", this.renderer.selectMode);
+				if (!this.renderer.selectMode) this.renderer.clearSelection();
+			};
+		}
 
 		this.graphEl = this.rootEl.createDiv({ cls: "bases-graph-canvas-host" });
 		this.tablesEl = this.rootEl.createDiv({ cls: "bases-graph-tables" });
 
 		this.renderer = new GraphRenderer(this.graphEl, {
-			onNodeClick: (i, e) => this.openNode(i, Keymap.isModEvent(e)),
+			onNodeClick: (i) => this.openNode(i, false),
+			onNodeDoubleClick: (i) => this.openNode(i, "tab"),
 			onNodeMenu: (i, e) => this.nodeMenu(i, e),
-			onDrag: (i, x, y) => this.sim.send({ type: "drag", index: i, x, y }),
-			onDragEnd: (i) => this.sim.send({ type: "dragEnd", index: i }),
+			// Заморожений режим без Ctrl: вузли рухаються лише в рендері, воркер дізнається про результат.
+			onDragStart: (indices, rope) => {
+				this.ropeDrag = this.frozen && rope;
+				if (!this.frozen || this.ropeDrag) this.sim.send({ type: "dragStart", indices, rope: this.ropeDrag });
+			},
+			onDrag: (indices, xy) => {
+				if (!this.frozen || this.ropeDrag) this.sim.send({ type: "drag", indices, xy });
+			},
+			onDragEnd: (indices, xy) => {
+				if (this.frozen && !this.ropeDrag) this.sim.send({ type: "move", indices, xy });
+				else this.sim.send({ type: "dragEnd", indices });
+				this.ropeDrag = false;
+			},
+			onSelectionChange: () => this.updateStatus(),
 		});
 		this.rendererReady = this.renderer.init(this.theme).catch((e) => {
 			console.error("[bases-graph] Pixi init failed", e);
@@ -98,6 +129,7 @@ export class GraphView extends BasesView {
 
 	static options(): BasesAllOptions[] {
 		return [
+			{ type: "dropdown", key: "layout", displayName: "Layout", options: { force: "Force", frozen: "Frozen force" }, default: DEFAULT_SETTINGS.layout },
 			{
 				type: "group",
 				displayName: "Forces",
@@ -219,6 +251,12 @@ export class GraphView extends BasesView {
 		const settings = this.settings();
 		this.renderer.labelZoom = settings.labelZoom;
 		this.renderer.fixedLabelSize = settings.fixedLabelSize;
+		const frozen = settings.layout === "frozen";
+		const frozenChanged = frozen !== this.frozen;
+		this.frozen = frozen;
+		this.freezeBtn.toggleClass("is-active", frozen);
+		this.freezeBtn.setAttr("aria-label", frozen ? "Unfreeze layout" : "Freeze layout");
+		this.reheatBtn.setAttr("aria-label", frozen ? "Recalculate layout once" : "Restart simulation");
 
 		const model = buildGraph(entries, this.tables, this.ev, this.theme);
 		const errorsChanged = !this.model || [...model.errors].join() !== [...this.model.errors].join();
@@ -251,14 +289,17 @@ export class GraphView extends BasesView {
 			this.structureSig = sig;
 			this.forcesSig = forcesSig;
 			this.simVersion++;
-			this.sim.send({ type: "graph", nodes: simNodes, links: model.edges.map((e) => [e.s, e.t]), forces });
+			this.sim.send({ type: "graph", nodes: simNodes, links: model.edges.map((e) => [e.s, e.t]), forces, frozen });
 			if (this.fitPending && known > model.nodes.length / 2) {
 				this.fitPending = false;
 				this.renderer.fit();
 			}
-		} else if (forcesSig !== this.forcesSig) {
-			this.forcesSig = forcesSig;
-			this.sim.send({ type: "forces", forces });
+		} else {
+			if (forcesSig !== this.forcesSig) {
+				this.forcesSig = forcesSig;
+				this.sim.send({ type: "forces", forces });
+			}
+			if (frozenChanged) this.sim.send({ type: "frozen", frozen });
 		}
 
 		this.updateStatus();
@@ -282,7 +323,9 @@ export class GraphView extends BasesView {
 		const m = this.model;
 		if (!m) return;
 		const err = m.errors.size ? ` · ⚠ ${m.errors.size}` : "";
-		this.statusEl.setText(`${m.nodes.length} nodes · ${m.edges.length} links${err}`);
+		const selected = this.renderer.getSelectedIndices().length;
+		const sel = selected ? ` · ${selected} selected` : "";
+		this.statusEl.setText(`${m.nodes.length} nodes · ${m.edges.length} links${sel}${err}`);
 	}
 
 	// ---------- Режими й таблиці ----------
@@ -339,12 +382,18 @@ export class GraphView extends BasesView {
 		menu.addItem((it) => it.setTitle("Open").setIcon("file").onClick(() => this.openNode(i, false)));
 		menu.addItem((it) => it.setTitle("Open in new tab").setIcon("file-plus").onClick(() => this.openNode(i, "tab")));
 		menu.addSeparator();
-		menu.addItem((it) => it.setTitle(isPinned ? "Unpin" : "Pin").setIcon(isPinned ? "pin-off" : "pin").onClick(() => {
-			if (isPinned) this.pinned.delete(id);
-			else this.pinned.add(id);
-			this.sim.send({ type: "pin", index: i, pinned: !isPinned });
+		// Якщо вузол у виділенні — дія стосується всього виділення.
+		const targets = this.renderer.isSelected(i) ? this.renderer.getSelectedIndices() : [i];
+		const suffix = targets.length > 1 ? ` (${targets.length})` : "";
+		menu.addItem((it) => it.setTitle((isPinned ? "Unpin" : "Pin") + suffix).setIcon(isPinned ? "pin-off" : "pin").onClick(() => {
 			const p = this.renderer.getPositions();
-			this.plugin.positions.setPinned(this.posKey, id, p[i * 2], p[i * 2 + 1], !isPinned);
+			for (const t of targets) {
+				const tid = this.ids[t];
+				if (isPinned) this.pinned.delete(tid);
+				else this.pinned.add(tid);
+				this.plugin.positions.setPinned(this.posKey, tid, p[t * 2], p[t * 2 + 1], !isPinned);
+			}
+			this.sim.send({ type: "pin", indices: targets, pinned: !isPinned });
 		}));
 		menu.showAtMouseEvent(e as MouseEvent);
 	}

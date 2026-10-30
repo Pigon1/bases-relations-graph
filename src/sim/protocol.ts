@@ -17,11 +17,18 @@ export interface SimNodeIn {
 }
 
 export type ToWorker =
-	| { type: "graph"; nodes: SimNodeIn[]; links: [number, number][]; forces: SimForces }
+	/** frozen — фізика вимкнена; нові вузли розставляються короткою локальною симуляцією. */
+	| { type: "graph"; nodes: SimNodeIn[]; links: [number, number][]; forces: SimForces; frozen: boolean }
 	| { type: "forces"; forces: SimForces }
-	| { type: "drag"; index: number; x: number; y: number }
-	| { type: "dragEnd"; index: number }
-	| { type: "pin"; index: number; pinned: boolean }
+	| { type: "frozen"; frozen: boolean }
+	/** rope — «мотузка» (лише в замороженому режимі): сусіди тягнуться за натягнутими зв'язками. */
+	| { type: "dragStart"; indices: number[]; rope: boolean }
+	/** xy: [x0, y0, x1, y1, …] для indices. */
+	| { type: "drag"; indices: number[]; xy: number[] }
+	| { type: "dragEnd"; indices: number[] }
+	/** Пряме переміщення без фізики (заморожений режим). */
+	| { type: "move"; indices: number[]; xy: number[] }
+	| { type: "pin"; indices: number[]; pinned: boolean }
 	| { type: "reheat" }
 	| { type: "stop" };
 
