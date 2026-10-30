@@ -76,9 +76,56 @@ export interface EdgeRule {
 	labelBackground?: string | null;
 }
 
+/** Підпис групи: її назва, довільний текст або без підпису. */
+/** Підпис групи: як у Nodes (без підпису / текст / властивість) плюс значення, за яким групуємо. */
+export type GroupLabel = LabelSpec | { type: "value" };
+
+/** MANUAL — як «Вручну» в Bases: лише вибрані значення, у заданому порядку. */
+export type GroupDirection = "ASC" | "DESC" | "MANUAL";
+
+/** Колір підпису групи, що наслідує колір самої групи. */
+export const GROUP_COLOR_AUTO = "@group";
+
+/**
+ * Рядок таблиці Groups — як кнопка «Групувати» в Bases: вузли групуються за значенням
+ * властивості groupBy, і кожне окреме значення дає окрему групу. Вузли без значення
+ * в групи не потрапляють. Порядок груп (і кольори палітри) — за direction.
+ * Колір без значення — з палітри, окремий для кожної групи.
+ */
+export interface GroupRule {
+	id: string;
+	name: string;
+	enabled: boolean;
+	groupBy: string | null;
+	direction: GroupDirection | null;
+	/** Для MANUAL: ключі показаних значень у потрібному порядку; решта значень груп не утворює. */
+	order?: string[] | null;
+	color: string | null;
+	/** null — значення групи. */
+	label: GroupLabel | null;
+	labelSize: number | null;
+	/** GROUP_COLOR_AUTO — колір групи. */
+	labelColor: string | null;
+	labelBackground: string | null;
+}
+
+export const GROUP_LABEL_SIZE = 12;
+
+/** Палітра груп за замовчуванням. */
+export const GROUP_PALETTE = [
+	"#4ecdc4", "#5bc06c", "#a78bfa", "#f59e42", "#ef5b5b",
+	"#5b9cf5", "#e879b9", "#d4b84a", "#9b8574", "#8d99ae",
+];
+
+export function paletteColor(index: number): string {
+	return GROUP_PALETTE[index % GROUP_PALETTE.length];
+}
+
 export interface GraphTables {
 	nodes: NodeRule[];
 	edges: EdgeRule[];
+	/** У старих поданнях груп може не бути. */
+	groups: GroupRule[];
 }
 
 /** Налаштування подання (опції Bases). */
@@ -92,6 +139,11 @@ export interface GraphSettings {
 	linkStrength: number;
 	linkDistance: number;
 	labelZoom: number;
+	/** Притягання вузлів до центру їхньої групи (0–1). */
+	groupForce: number;
+	/** Відштовхування груп одна від одної (0–1). */
+	groupSeparation: number;
+	showLegend: boolean;
 	/** Підписи сталого розміру на екрані (не масштабуються разом із графом). */
 	fixedLabelSize: boolean;
 	savePositions: boolean;
@@ -104,6 +156,9 @@ export const DEFAULT_SETTINGS: GraphSettings = {
 	linkStrength: 1,
 	linkDistance: 250,
 	labelZoom: 0.6,
+	groupForce: 0.3,
+	groupSeparation: 0.5,
+	showLegend: true,
 	fixedLabelSize: false,
 	savePositions: true,
 };
@@ -157,6 +212,14 @@ export function defaultTables(theme: ThemeColors): GraphTables {
 				label: { type: "none" },
 			},
 		],
+		groups: [],
+	};
+}
+
+export function emptyGroupRule(): GroupRule {
+	return {
+		id: newId("g"), name: "", enabled: true, groupBy: null, direction: null, color: null,
+		label: null, labelSize: null, labelColor: GROUP_COLOR_AUTO, labelBackground: null,
 	};
 }
 

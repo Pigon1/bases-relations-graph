@@ -1,6 +1,7 @@
 import { BasesView, getIcon, Menu, Platform, setIcon, type BasesAllOptions, type QueryController } from "obsidian";
 import { BasesEvaluator } from "../bases/evaluator";
-import { buildGraph, type GraphModel } from "../model/build";
+import { toCss } from "../model/color";
+import { buildGraph, groupValues, type GraphModel } from "../model/build";
 import { readThemeColors } from "../model/theme";
 import { DEFAULT_SETTINGS, defaultTables, type GraphSettings, type GraphTables, type ThemeColors } from "../model/types";
 import { GraphRenderer } from "../render/renderer";
@@ -8,12 +9,12 @@ import { SimClient } from "../sim/client";
 import type { FromWorker, SimForces } from "../sim/protocol";
 import { PositionStore, type SavedPos } from "../store/positions";
 import { PropertyCatalog } from "../ui/properties";
-import { renderEdgesTable, renderNodesTable, type TablesContext } from "../ui/tables";
+import { renderEdgesTable, renderGroupsTable, renderNodesTable, type TablesContext } from "../ui/tables";
 import type BasesGraphPlugin from "../main";
 
 export const VIEW_TYPE = "bases-graph";
 
-type Mode = "graph" | "nodes" | "edges";
+type Mode = "graph" | "nodes" | "edges" | "groups";
 const TABLES_SAVE_DELAY = 400;
 
 export class GraphView extends BasesView {
@@ -53,6 +54,7 @@ export class GraphView extends BasesView {
 	private frozen = false;
 	private ropeDrag = false;
 	private freezeBtn!: HTMLElement;
+	private legendEl!: HTMLElement;
 	private reheatBtn!: HTMLElement;
 
 	constructor(private controller: QueryController, containerEl: HTMLElement, private plugin: BasesGraphPlugin) {
@@ -68,7 +70,7 @@ export class GraphView extends BasesView {
 		this.rootEl = containerEl.createDiv({ cls: "bases-graph" });
 		const bar = this.rootEl.createDiv({ cls: "bases-graph-toolbar" });
 		const seg = bar.createDiv({ cls: "bases-graph-segmented" });
-		for (const [m, label, icon] of [["graph", "Graph", "git-fork"], ["nodes", "Nodes", "circle-dot"], ["edges", "Links", "spline"]] as [Mode, string, string][]) {
+		for (const [m, label, icon] of [["graph", "Graph", "git-fork"], ["nodes", "Nodes", "circle-dot"], ["edges", "Links", "spline"], ["groups", "Groups", "boxes"]] as [Mode, string, string][]) {
 			const b = seg.createEl("button", { cls: "bases-graph-seg" });
 			setIcon(b.createSpan(), icon);
 			b.createSpan({ text: label });
@@ -98,6 +100,7 @@ export class GraphView extends BasesView {
 		}
 
 		this.graphEl = this.rootEl.createDiv({ cls: "bases-graph-canvas-host" });
+		this.legendEl = this.graphEl.createDiv({ cls: "bases-graph-legend" });
 		this.tablesEl = this.rootEl.createDiv({ cls: "bases-graph-tables" });
 
 		this.renderer = new GraphRenderer(this.graphEl, {
@@ -147,6 +150,15 @@ export class GraphView extends BasesView {
 					{ type: "slider", key: "labelZoom", displayName: "Show labels from zoom", min: 0.05, max: 3, step: 0.05, default: DEFAULT_SETTINGS.labelZoom },
 					{ type: "toggle", key: "fixedLabelSize", displayName: "Constant label size on screen", default: DEFAULT_SETTINGS.fixedLabelSize },
 					{ type: "toggle", key: "savePositions", displayName: "Remember node positions", default: DEFAULT_SETTINGS.savePositions },
+				],
+			},
+			{
+				type: "group",
+				displayName: "Groups",
+				items: [
+					{ type: "slider", key: "groupForce", displayName: "Group force", min: 0, max: 1, step: 0.01, default: DEFAULT_SETTINGS.groupForce },
+					{ type: "slider", key: "groupSeparation", displayName: "Group separation", min: 0, max: 1, step: 0.01, default: DEFAULT_SETTINGS.groupSeparation },
+					{ type: "toggle", key: "showLegend", displayName: "Show group legend", default: DEFAULT_SETTINGS.showLegend },
 				],
 			},
 		];
@@ -222,7 +234,8 @@ export class GraphView extends BasesView {
 		}
 		// Локальні правки ще не записані — вони новіші за те, що зараз у конфігурації.
 		if (this.tablesTimer !== null && this.tables) return;
-		const json = JSON.stringify({ nodes, edges });
+		const groups = this.config.get("groups");
+		const json = JSON.stringify({ nodes, edges, groups: Array.isArray(groups) ? groups : [] });
 		if (this.tables && (json === this.tablesJson || json === this.writtenJson)) return;
 		// Зміна ззовні (інше вікно, синхронізація, ручне редагування .base).
 		this.tables = JSON.parse(json) as GraphTables;
@@ -240,6 +253,7 @@ export class GraphView extends BasesView {
 			const copy = JSON.parse(this.tablesJson) as GraphTables;
 			this.config.set("nodes", copy.nodes);
 			this.config.set("edges", copy.edges);
+			this.config.set("groups", copy.groups ?? []);
 		};
 		if (immediate) write();
 		else this.tablesTimer = window.setTimeout(write, TABLES_SAVE_DELAY);
@@ -262,12 +276,15 @@ export class GraphView extends BasesView {
 		const errorsChanged = !this.model || [...model.errors].join() !== [...this.model.errors].join();
 		this.model = model;
 
-		const sig = model.nodes.map((n) => n.id + ":" + Math.round(n.radius)).join("\n") + "|" + model.edges.map((e) => e.s + "-" + e.t).join(",");
+		const sig = model.nodes.map((n) => n.id + ":" + Math.round(n.radius)).join("\n") + "|" + model.edges.map((e) => e.s + "-" + e.t).join(",")
+			+ "|" + model.groups.map((g) => g.members.join(",")).join(";");
 		const forces: SimForces = {
 			centerStrength: settings.centerStrength,
 			repelStrength: settings.repelStrength,
 			linkStrength: settings.linkStrength,
 			linkDistance: settings.linkDistance,
+			groupForce: settings.groupForce,
+			groupSeparation: settings.groupSeparation,
 		};
 		const forcesSig = JSON.stringify(forces);
 
@@ -283,13 +300,14 @@ export class GraphView extends BasesView {
 			return { id: n.id, r: n.radius, x: p?.[0], y: p?.[1], pinned: this.pinned.has(n.id) };
 		});
 		this.ids = model.nodes.map((n) => n.id);
-		this.renderer.setGraph(model.nodes, model.edges, pos);
+		this.renderer.setGraph(model.nodes, model.edges, model.groups, pos);
+		this.renderLegend(settings.showLegend);
 
 		if (sig !== this.structureSig) {
 			this.structureSig = sig;
 			this.forcesSig = forcesSig;
 			this.simVersion++;
-			this.sim.send({ type: "graph", nodes: simNodes, links: model.edges.map((e) => [e.s, e.t]), forces, frozen });
+			this.sim.send({ type: "graph", nodes: simNodes, links: model.edges.map((e) => [e.s, e.t]), groups: model.groups.map((g) => g.members), forces, frozen });
 			if (this.fitPending && known > model.nodes.length / 2) {
 				this.fitPending = false;
 				this.renderer.fit();
@@ -316,6 +334,19 @@ export class GraphView extends BasesView {
 				this.renderer.fit();
 			}
 			if (this.settings().savePositions) this.plugin.positions.update(this.posKey, this.ids, m.positions, m.pinned);
+		}
+	}
+
+	/** Легенда груп у кутку графа. */
+	private renderLegend(show: boolean): void {
+		const el = this.legendEl;
+		el.empty();
+		const groups = this.model?.groups ?? [];
+		el.toggle(show && groups.length > 0);
+		for (const g of groups) {
+			const item = el.createDiv({ cls: "bases-graph-legend-item" });
+			item.createSpan({ cls: "bases-graph-legend-dot" }).style.background = toCss({ rgb: g.color, alpha: g.alpha });
+			item.createSpan({ text: g.name });
 		}
 	}
 
@@ -347,6 +378,7 @@ export class GraphView extends BasesView {
 			ev: this.ev,
 			theme: this.theme,
 			errors: this.model?.errors ?? new Map(),
+			groupValues: (property) => groupValues(this.data?.data ?? [], property),
 			onChange: (structural) => {
 				this.saveTables();
 				this.rebuild();
@@ -361,7 +393,8 @@ export class GraphView extends BasesView {
 		}
 		const left = this.tablesEl.querySelector(".bases-graph-table-scroll")?.scrollLeft ?? 0;
 		if (this.mode === "nodes") renderNodesTable(this.tablesEl, this.tables, ctx);
-		else renderEdgesTable(this.tablesEl, this.tables, ctx);
+		else if (this.mode === "edges") renderEdgesTable(this.tablesEl, this.tables, ctx);
+		else renderGroupsTable(this.tablesEl, this.tables, ctx);
 		for (const [el, top] of scrolled) el.scrollTop = top;
 		const scroller = this.tablesEl.querySelector(".bases-graph-table-scroll");
 		if (scroller) scroller.scrollLeft = left;

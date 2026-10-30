@@ -1,5 +1,5 @@
 import { Application, Container, Graphics, Text } from "pixi.js";
-import type { GEdge, GNode, LabelData } from "../model/build";
+import type { GEdge, GGroup, GNode, LabelData } from "../model/build";
 import { parseColor } from "../model/color";
 import type { ThemeColors } from "../model/types";
 import { SpatialGrid } from "./spatial";
@@ -80,6 +80,10 @@ export class GraphRenderer {
 	private ready = false;
 	private world = new Container();
 	private edgeGfx = new Graphics();
+	private hullGfx = new Graphics();
+	private groupLabelLayer = new Container();
+	private groups: GGroup[] = [];
+	private groupLabels: (LabelSprite | null)[] = [];
 	private nodeLayer = new Container();
 	private labelLayer = new Container();
 	private edgeLabelLayer = new Container();
@@ -147,7 +151,7 @@ export class GraphRenderer {
 		this.fontFamily = getComputedStyle(this.host).fontFamily || "sans-serif";
 		this.setTheme(theme);
 
-		this.world.addChild(this.edgeGfx, this.nodeLayer, this.selGfx, this.edgeLabelLayer, this.labelLayer);
+		this.world.addChild(this.hullGfx, this.edgeGfx, this.nodeLayer, this.selGfx, this.edgeLabelLayer, this.labelLayer, this.groupLabelLayer);
 		this.app.stage.addChild(this.world, this.bandGfx);
 		this.tx = w / 2;
 		this.ty = h / 2;
@@ -173,7 +177,8 @@ export class GraphRenderer {
 	}
 
 	/** Нова структура графа. `pos` — стартові позиції в порядку вузлів. */
-	setGraph(nodes: GNode[], edges: GEdge[], pos: Float32Array): void {
+	setGraph(nodes: GNode[], edges: GEdge[], groups: GGroup[], pos: Float32Array): void {
+		this.groups = groups;
 		this.nodes = nodes;
 		this.edges = edges;
 		this.pos = pos;
@@ -193,6 +198,8 @@ export class GraphRenderer {
 		for (const g of this.nodeGfx) g.destroy();
 		for (const list of this.labels) for (const l of list) l.destroy({ children: true });
 		for (const l of this.edgeLabels) l?.destroy({ children: true });
+		for (const l of this.groupLabels) l?.destroy({ children: true });
+		this.groupLabelLayer.removeChildren();
 		this.nodeLayer.removeChildren();
 		this.labelLayer.removeChildren();
 		this.edgeLabelLayer.removeChildren();
@@ -205,6 +212,7 @@ export class GraphRenderer {
 		});
 		this.labels = nodes.map((n) => n.labels.map((d) => this.makeLabel(d, this.labelLayer)));
 		this.edgeLabels = edges.map((e) => (e.label ? this.makeLabel(e.label, this.edgeLabelLayer) : null));
+		this.groupLabels = groups.map((g) => (g.label ? this.makeLabel(g.label, this.groupLabelLayer) : null));
 		this.requestRender();
 	}
 
@@ -322,6 +330,8 @@ export class GraphRenderer {
 				if (visible) this.placeNodeLabels(i, x, y, k);
 			}
 		}
+
+		this.drawGroups(k);
 
 		// Виділені вузли — кільце кольором підсвічування.
 		const sel = this.selGfx;
@@ -451,6 +461,32 @@ export class GraphRenderer {
 		this.hover = i;
 		this.app.canvas.style.cursor = i >= 0 ? "pointer" : "";
 		this.requestRender();
+	}
+
+	/**
+	 * Обведення груп: опукла оболонка кіл членів (з відступом) — заливка кольором групи
+	 * з прозорістю й щільніший контур. Підпис групи — над оболонкою по центру.
+	 */
+	private drawGroups(k: number): void {
+		const g = this.hullGfx;
+		g.clear();
+		const scale = this.scale;
+		this.groups.forEach((grp, gi) => {
+			const pts = hullPoints(grp.members, this.pos, this.hitRadii, GROUP_PADDING);
+			const hull = convexHull(pts);
+			if (hull.length < 6) return;
+			g.poly(hull).fill({ color: grp.color, alpha: grp.alpha * 0.12 })
+				.stroke({ width: 1.5 / scale, color: grp.color, alpha: grp.alpha * 0.6 });
+			const lbl = this.groupLabels[gi];
+			if (!lbl) return;
+			let minX = Infinity, maxX = -Infinity, minY = Infinity;
+			for (let i = 0; i < hull.length; i += 2) {
+				minX = Math.min(minX, hull[i]); maxX = Math.max(maxX, hull[i]);
+				minY = Math.min(minY, hull[i + 1]);
+			}
+			lbl.scale.set(k);
+			lbl.position.set((minX + maxX) / 2 - (lbl.w * k) / 2, minY - lbl.h * k - 3 * k);
+		});
 	}
 
 	// ---------- Виділення ----------
@@ -709,6 +745,62 @@ export class GraphRenderer {
 		if (this.ready) this.app.destroy(true, { children: true });
 		this.ready = false;
 	}
+}
+
+/** Відступ оболонки групи від краю вузлів (одиниці світу). */
+const GROUP_PADDING = 14;
+/** Скільки точок кола береться для кожного вузла оболонки. */
+const HULL_SAMPLES = 12;
+/** Для великих груп кола беруться лише для вузлів на краю групи та найбільших вузлів. */
+const HULL_FULL_LIMIT = 300;
+
+/** Точки кіл навколо членів групи: [x0, y0, x1, y1, …]. */
+function hullPoints(members: number[], pos: Float32Array, radii: Float32Array, pad: number): number[] {
+	let list = members;
+	if (members.length > HULL_FULL_LIMIT) {
+		const centers: number[] = [];
+		for (const i of members) centers.push(pos[i * 2], pos[i * 2 + 1]);
+		const edge = new Set(convexHullIndices(centers).map((k) => members[k]));
+		const big = [...members].sort((a, b) => radii[b] - radii[a]).slice(0, 50);
+		for (const i of big) edge.add(i);
+		list = [...edge];
+	}
+	const out: number[] = [];
+	for (const i of list) {
+		const x = pos[i * 2], y = pos[i * 2 + 1], r = radii[i] + pad;
+		for (let s = 0; s < HULL_SAMPLES; s++) {
+			const a = (s / HULL_SAMPLES) * Math.PI * 2;
+			out.push(x + Math.cos(a) * r, y + Math.sin(a) * r);
+		}
+	}
+	return out;
+}
+
+/** Опукла оболонка (монотонний ланцюг Ендрю): індекси точок у порядку обходу. */
+function convexHullIndices(flat: number[]): number[] {
+	const n = flat.length / 2;
+	if (n < 3) return [...Array(n).keys()];
+	const idx = [...Array(n).keys()].sort((a, b) => flat[a * 2] - flat[b * 2] || flat[a * 2 + 1] - flat[b * 2 + 1]);
+	const cross = (o: number, a: number, b: number) =>
+		(flat[a * 2] - flat[o * 2]) * (flat[b * 2 + 1] - flat[o * 2 + 1]) - (flat[a * 2 + 1] - flat[o * 2 + 1]) * (flat[b * 2] - flat[o * 2]);
+	const lower: number[] = [];
+	for (const p of idx) {
+		while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
+		lower.push(p);
+	}
+	const upper: number[] = [];
+	for (let k = idx.length - 1; k >= 0; k--) {
+		const p = idx[k];
+		while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
+		upper.push(p);
+	}
+	return lower.slice(0, -1).concat(upper.slice(0, -1));
+}
+
+function convexHull(flat: number[]): number[] {
+	const out: number[] = [];
+	for (const k of convexHullIndices(flat)) out.push(flat[k * 2], flat[k * 2 + 1]);
+	return out;
 }
 
 function drawShape(g: Graphics, n: GNode): void {

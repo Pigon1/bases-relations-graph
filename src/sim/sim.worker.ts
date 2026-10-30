@@ -28,7 +28,18 @@ let nodes: N[] = [];
 let links: L[] = [];
 let degree: number[] = [];
 let version = 0;
-let forces: SimForces = { centerStrength: 0.52, repelStrength: 10, linkStrength: 1, linkDistance: 250 };
+let forces: SimForces = { centerStrength: 0.52, repelStrength: 10, linkStrength: 1, linkDistance: 250, groupForce: 0.3, groupSeparation: 0.5 };
+/** Члени груп (індекси вузлів). */
+let groups: number[][] = [];
+/** Позначки членства: groupMask[g][i] = 1, якщо вузол i у групі g. */
+let groupMask: Uint8Array[] = [];
+/**
+ * Частка спільних вузлів пари груп (від меншої групи): overlap[a * G + b].
+ * Групи, що перекриваються, не розштовхуються одна від одної (або слабше).
+ */
+let overlap = new Float32Array(0);
+/** Додатковий відступ, на який група виштовхує чужі вузли. */
+const GROUP_EXCLUSION_MARGIN = 12;
 let frozen = false;
 /**
  * Що зараз робить симуляція:
@@ -56,7 +67,78 @@ function applyForces(): void {
 	sim.force("x", forceX<N>(0).strength(f.centerStrength * 0.1));
 	sim.force("y", forceY<N>(0).strength(f.centerStrength * 0.1));
 	sim.force("collide", forceCollide<N>((n) => n.r + 2).strength(0.6));
+	sim.force("group", groups.length ? groupForce : null);
 	sim.velocityDecay(0.4);
+}
+
+/**
+ * Групи: члени тягнуться до центру своєї групи (вузол кількох груп — до кожного центру,
+ * тож опиняється між ними), групи, що перекриваються, розштовхуються цілком,
+ * а вузли, що не належать групі, виштовхуються з її кола.
+ */
+function groupForce(alpha: number): void {
+	const attract = forces.groupForce * 0.1 * alpha;
+	const separate = forces.groupSeparation * 0.5 * alpha;
+	const cx: number[] = [], cy: number[] = [], rad: number[] = [];
+	for (const g of groups) {
+		let sx = 0, sy = 0, sr = 0;
+		for (const i of g) { sx += nodes[i].x!; sy += nodes[i].y!; sr += nodes[i].r; }
+		const x = sx / g.length, y = sy / g.length;
+		let d2 = 0;
+		for (const i of g) d2 += (nodes[i].x! - x) ** 2 + (nodes[i].y! - y) ** 2;
+		cx.push(x); cy.push(y);
+		// Радіус групи: розкид членів, але не більше «природного» розміру групи з такою
+		// кількістю й величиною вузлів. Без обмеження розтягнута група вважалася б більшою,
+		// сильніше штовхалася — і розтягувалася ще більше.
+		const avgR = sr / g.length;
+		const spread = Math.sqrt(d2 / g.length) * 1.4 + avgR + 20;
+		const natural = Math.sqrt(g.length) * (avgR * 2 + 40) + avgR + 20;
+		rad.push(Math.min(spread, natural));
+	}
+	if (attract > 0) {
+		groups.forEach((g, k) => {
+			for (const i of g) {
+				const n = nodes[i];
+				n.vx! += (cx[k] - n.x!) * attract;
+				n.vy! += (cy[k] - n.y!) * attract;
+			}
+		});
+	}
+	if (separate > 0) {
+		// Чужі вузли — за межі групи. Сила зростає з глибиною проникнення.
+		groups.forEach((g, k) => {
+			const mask = groupMask[k];
+			const x = cx[k], y = cy[k], R = rad[k];
+			for (let i = 0; i < nodes.length; i++) {
+				if (mask[i]) continue;
+				const n = nodes[i];
+				const dx = n.x! - x, dy = n.y! - y;
+				const lim = R + n.r + GROUP_EXCLUSION_MARGIN;
+				if (Math.abs(dx) > lim || Math.abs(dy) > lim) continue;
+				const d = Math.hypot(dx, dy) || 1;
+				if (d >= lim) continue;
+				const push = ((lim - d) / d) * separate;
+				n.vx! += dx * push;
+				n.vy! += dy * push;
+			}
+		});
+		for (let a = 0; a < groups.length; a++) {
+			for (let b = a + 1; b < groups.length; b++) {
+				const dx = cx[a] - cx[b], dy = cy[a] - cy[b];
+				const d = Math.hypot(dx, dy) || 1;
+				// Групи зі спільними вузлами з'єднані ними — розштовхуються лише пропорційно
+				// до неспільної частини.
+				const free = 1 - overlap[a * groups.length + b];
+				if (free <= 0) continue;
+				const min = rad[a] + rad[b] + 40;
+				if (d >= min) continue;
+				// Спільні члени отримують обидва поштовхи, і ті взаємно гасяться.
+				const push = ((min - d) / d) * separate * free;
+				for (const i of groups[a]) { nodes[i].vx! += dx * push; nodes[i].vy! += dy * push; }
+				for (const i of groups[b]) { nodes[i].vx! -= dx * push; nodes[i].vy! -= dy * push; }
+			}
+		}
+	}
 }
 
 function positions(): Float32Array {
@@ -166,7 +248,7 @@ function startRope(dragged: number[]): void {
 			b.vx! -= dx * k * wb; b.vy! -= dy * k * wb;
 		}
 	};
-	sim.force("link", null).force("charge", null).force("x", null).force("y", null);
+	sim.force("link", null).force("charge", null).force("x", null).force("y", null).force("group", null);
 	sim.force("rope", rope);
 	sim.velocityDecay(0.7);
 	sim.alpha(1).alphaTarget(1).restart();
@@ -208,6 +290,22 @@ ctx.onmessage = (e) => {
 			for (const n of nodes) if (n.x === undefined) { n.x = (Math.random() - 0.5) * spread; n.y = (Math.random() - 0.5) * spread; }
 
 			links = m.links.map(([s, t]) => ({ source: s, target: t }));
+			groups = m.groups.filter((g) => g.length > 0);
+			groupMask = groups.map((g) => {
+				const mask = new Uint8Array(nodes.length);
+				for (const i of g) mask[i] = 1;
+				return mask;
+			});
+			const G = groups.length;
+			overlap = new Float32Array(G * G);
+			for (let a = 0; a < G; a++) {
+				for (let b = a + 1; b < G; b++) {
+					const [small, other] = groups[a].length <= groups[b].length ? [groups[a], groupMask[b]] : [groups[b], groupMask[a]];
+					let shared = 0;
+					for (const i of small) if (other[i]) shared++;
+					overlap[a * G + b] = overlap[b * G + a] = shared / small.length;
+				}
+			}
 			sim.nodes(nodes);
 			applyForces();
 			const fresh = nodes.length - known.size;

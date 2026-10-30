@@ -1,11 +1,12 @@
-import { setIcon, type App } from "obsidian";
+import { Menu, setIcon, type App } from "obsidian";
 import type { BasesEvaluator } from "../bases/evaluator";
 import { parseColor, toCss, toHex } from "../model/color";
 import {
-	emptyEdgeRule, emptyNodeRule, FIXED, LINK_COUNT, SOURCE_NOTE, TARGET_ALL_LINKS,
-	type EdgeRule, type FilterTree, type GraphTables, type LabelSpec, type NodeRule, type ThemeColors,
+	emptyEdgeRule, emptyGroupRule, emptyNodeRule, FIXED, GROUP_COLOR_AUTO, paletteColor, LINK_COUNT, SOURCE_NOTE, TARGET_ALL_LINKS,
+	type EdgeRule, type FilterTree, type GraphTables, type GroupLabel, type GroupRule, type LabelSpec, type NodeRule, type ThemeColors,
 } from "../model/types";
 import { ConditionModal, describeCondition } from "./condition";
+import { GroupOrderModal } from "./groupOrder";
 import { createPicker, type PickItem } from "./picker";
 import type { PropertyCatalog } from "./properties";
 
@@ -15,6 +16,8 @@ export interface TablesContext {
 	ev: BasesEvaluator;
 	theme: ThemeColors;
 	errors: Map<string, string>;
+	/** Наявні значення властивості для груп (за зростанням). */
+	groupValues(property: string): string[];
 	/** structural = рядки додано/видалено/переміщено — таблицю треба перемалювати. */
 	onChange(structural: boolean): void;
 }
@@ -42,13 +45,38 @@ function numberCell(td: HTMLElement, value: number | null, onChange: (v: number 
 	};
 }
 
-function colorCell(td: HTMLElement, value: string | null, fallback: string, onChange: (v: string | null) => void): void {
+/**
+ * Колір із прозорістю.
+ * - auto: порожнє значення означає не «успадкувати», а автоматичний колір;
+ * - followValue: спеціальне значення «Auto — як колір групи», що вибирається з меню.
+ */
+function colorCell(
+	td: HTMLElement, value: string | null, fallback: string, onChange: (v: string | null) => void,
+	auto = false, followValue: string | null = null,
+): void {
 	const wrap = td.createDiv({ cls: "bases-graph-color" });
+	const clearButton = () => {
+		const clear = wrap.createEl("button", { cls: "clickable-icon", attr: { "aria-label": auto ? "Automatic" : "Inherit" } });
+		setIcon(clear, "x");
+		clear.onclick = () => { onChange(null); render(null); };
+	};
 	const render = (v: string | null) => {
 		wrap.empty();
-		if (v === null) {
-			const b = wrap.createEl("button", { text: "—", attr: { "aria-label": "Inherited. Click to set a color" } });
+		if (followValue !== null && v === followValue) {
+			const b = wrap.createEl("button", { text: "Auto", attr: { "aria-label": "Same as the group color. Click to set a color" } });
 			b.onclick = () => { onChange(fallback); render(fallback); };
+			clearButton();
+			return;
+		}
+		if (v === null) {
+			const b = wrap.createEl("button", { text: auto ? "auto" : "—", attr: { "aria-label": auto ? "Automatic color. Click to set a color" : "Inherited. Click to set a color" } });
+			b.onclick = (e) => {
+				if (followValue === null) { onChange(fallback); render(fallback); return; }
+				const menu = new Menu();
+				menu.addItem((it) => it.setTitle("Auto (group color)").setIcon("lucide-paintbrush").onClick(() => { onChange(followValue); render(followValue); }));
+				menu.addItem((it) => it.setTitle("Custom color").setIcon("lucide-palette").onClick(() => { onChange(fallback); render(fallback); }));
+				menu.showAtMouseEvent(e);
+			};
 			return;
 		}
 		const c = parseColor(v);
@@ -59,9 +87,7 @@ function colorCell(td: HTMLElement, value: string | null, fallback: string, onCh
 		const emit = () => onChange(toCss({ rgb: parseInt(picker.value.slice(1), 16), alpha: parseInt(alpha.value, 10) / 100 }));
 		picker.oninput = emit;
 		alpha.oninput = emit;
-		const clear = wrap.createEl("button", { cls: "clickable-icon", attr: { "aria-label": "Inherit" } });
-		setIcon(clear, "x");
-		clear.onclick = () => { onChange(null); render(null); };
+		clearButton();
 	};
 	render(value);
 }
@@ -137,10 +163,10 @@ function rowControls<T extends { enabled: boolean; name: string; id: string }>(
 	}
 }
 
-function deleteCell<T>(tr: HTMLElement, rows: T[], i: number, ctx: TablesContext): void {
+function deleteCell<T>(tr: HTMLElement, rows: T[], i: number, ctx: TablesContext, minRows = 1): void {
 	const del = tr.createEl("td").createEl("button", { cls: "clickable-icon", attr: { "aria-label": "Delete row" } });
 	setIcon(del, "trash-2");
-	del.disabled = rows.length <= 1;
+	del.disabled = rows.length <= minRows;
 	del.onclick = () => { rows.splice(i, 1); ctx.onChange(true); };
 }
 
@@ -247,6 +273,103 @@ export function renderEdgesTable(el: HTMLElement, tables: GraphTables, ctx: Tabl
 
 	el.createEl("button", { text: "+ Add row", cls: "bases-graph-add" }).onclick = () => {
 		rows.push(emptyEdgeRule());
+		ctx.onChange(true);
+	};
+}
+
+// ---------- Таблиця «Groups» ----------
+
+const DIRECTIONS: PickItem[] = [
+	{ value: "ASC", label: "Ascending", icon: "lucide-arrow-up-narrow-wide" },
+	{ value: "DESC", label: "Descending", icon: "lucide-arrow-down-wide-narrow" },
+	{ value: "MANUAL", label: "Manual", icon: "lucide-list-checks" },
+];
+
+/** Порядок груп: за зростанням, спаданням або вручну (вибрані значення в заданому порядку). */
+function orderCell(td: HTMLElement, ctx: TablesContext, r: GroupRule, row: number): void {
+	const openManual = () => {
+		if (!r.groupBy) return;
+		const modal = new GroupOrderModal(ctx.app, `Group order, row ${row + 1}`, ctx.groupValues(r.groupBy), r.order ?? [], (order) => {
+			r.order = order;
+			ctx.onChange(false);
+		});
+		// Після закриття — оновити лічильник показаних значень у клітинці.
+		modal.onClose = () => ctx.onChange(true);
+		modal.open();
+	};
+	createPicker(td, () => DIRECTIONS, r.direction ?? "ASC", {}, (v) => {
+		const dir = (v ?? "ASC") as NonNullable<GroupRule["direction"]>;
+		if (dir === "MANUAL" && !r.order?.length && r.groupBy) {
+			// Перехід на «Вручну» — починаємо з усіх значень у поточному порядку.
+			const values = ctx.groupValues(r.groupBy);
+			r.order = r.direction === "DESC" ? values.reverse() : values;
+		}
+		r.direction = dir;
+		ctx.onChange(true);
+		if (dir === "MANUAL") openManual();
+	});
+	if (r.direction === "MANUAL") {
+		const total = r.groupBy ? ctx.groupValues(r.groupBy).length : 0;
+		const present = new Set(r.groupBy ? ctx.groupValues(r.groupBy) : []);
+		const shown = (r.order ?? []).filter((v) => present.has(v)).length;
+		const b = td.createEl("button", { cls: "bases-graph-order-btn", text: `${shown}/${total}` });
+		setIcon(b.createSpan({ prepend: true }), "lucide-list-checks");
+		b.setAttr("aria-label", "Choose and order values");
+		b.onclick = openManual;
+	}
+}
+
+/** Підпис групи: як у Nodes, плюс «значення групи» (за замовчуванням). */
+function groupLabelCell(td: HTMLElement, ctx: TablesContext, value: GroupLabel | null, onChange: (v: GroupLabel | null) => void): void {
+	const items = (): PickItem[] => [
+		{ value: "@value", label: "Group value", icon: "lucide-tag" },
+		{ value: "@none", label: "No label", icon: "lucide-ban" },
+		{ value: "@text", label: "Text…", icon: "lucide-type" },
+		...propItems(ctx),
+	];
+	const current = value === null || value.type === "value" ? "@value"
+		: value.type === "none" ? "@none" : value.type === "text" ? "@text" : value.property;
+	let text: HTMLInputElement;
+	createPicker(td, items, current, { inherit: false }, (v) => {
+		if (v === null || v === "@value") onChange(null);
+		else if (v === "@none") onChange({ type: "none" });
+		else if (v === "@text") onChange({ type: "text", text: text.value });
+		else onChange({ type: "property", property: v });
+		text.toggle(v === "@text");
+		if (v === "@text") text.focus();
+	});
+	text = td.createEl("input", { type: "text", cls: "bases-graph-label-text", attr: { placeholder: "label text" } });
+	text.value = value?.type === "text" ? value.text : "";
+	text.toggle(value?.type === "text");
+	text.oninput = () => onChange({ type: "text", text: text.value });
+}
+
+export function renderGroupsTable(el: HTMLElement, tables: GraphTables, ctx: TablesContext): void {
+	el.empty();
+	el.createDiv({ cls: "bases-graph-hint", text: "Each row groups nodes by a property, like Group by in Bases: every distinct value becomes its own outlined group; nodes without a value stay ungrouped. A node can belong to groups from several rows. In the force layout groups pull their members together and push other nodes out." });
+	if (!tables.groups) tables.groups = [];
+	const rows = tables.groups;
+	if (rows.length) {
+		const scroll = el.createDiv({ cls: "bases-graph-table-scroll" });
+		const table = scroll.createEl("table", { cls: "bases-graph-table" });
+		header(table, ["#", "", "Name", "Group by", "Order", "Color", "Label", "Font size", "Font color", "Label background", ""]);
+		const body = table.createEl("tbody");
+		rows.forEach((r: GroupRule, i) => {
+			const tr = body.createEl("tr");
+			rowControls(tr, rows, i, ctx);
+			createPicker(tr.createEl("td"), () => propItems(ctx), r.groupBy ?? null, { placeholder: "Select property" }, (v) => { r.groupBy = v; ctx.onChange(false); });
+			orderCell(tr.createEl("td"), ctx, r, i);
+			// Порожній колір — окремий колір палітри для кожної групи рядка.
+			colorCell(tr.createEl("td"), r.color, paletteColor(i), (v) => { r.color = v; ctx.onChange(false); }, true);
+			groupLabelCell(tr.createEl("td"), ctx, r.label, (v) => { r.label = v; ctx.onChange(false); });
+			numberCell(tr.createEl("td"), r.labelSize ?? null, (v) => { r.labelSize = v; ctx.onChange(false); });
+			colorCell(tr.createEl("td"), r.labelColor ?? null, ctx.theme.text, (v) => { r.labelColor = v; ctx.onChange(false); }, false, GROUP_COLOR_AUTO);
+			colorCell(tr.createEl("td"), r.labelBackground ?? null, ctx.theme.background, (v) => { r.labelBackground = v; ctx.onChange(false); });
+			deleteCell(tr, rows, i, ctx, 0);
+		});
+	}
+	el.createEl("button", { text: "+ Add group", cls: "bases-graph-add" }).onclick = () => {
+		rows.push(emptyGroupRule());
 		ctx.onChange(true);
 	};
 }

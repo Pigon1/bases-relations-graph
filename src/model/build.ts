@@ -1,10 +1,11 @@
 import type { BasesEntry } from "obsidian";
 import type { BasesEvaluator, CompiledFilter } from "../bases/evaluator";
+import { NullValue, NumberValue } from "obsidian";
 import { getValue, linkedPaths, toNumber, toText } from "../bases/values";
-import { parseColor } from "./color";
+import { parseColor, toCss } from "./color";
 import {
 	FIXED, LINK_COUNT, SOURCE_NOTE, TARGET_ALL_LINKS,
-	EDGE_LABEL_SIZE, NODE_LABEL_SIZE,
+	EDGE_LABEL_SIZE, GROUP_COLOR_AUTO, GROUP_LABEL_SIZE, NODE_LABEL_SIZE, paletteColor,
 	type EdgeRule, type GraphTables, type LabelMode, type LabelSpec, type NodeRule, type Shape, type ThemeColors, type Visibility,
 } from "./types";
 
@@ -55,9 +56,20 @@ export interface GEdge {
 	connector: string | null;
 }
 
+export interface GGroup {
+	id: string;
+	name: string;
+	color: number;
+	alpha: number;
+	label: LabelData | null;
+	/** Індекси вузлів-членів. */
+	members: number[];
+}
+
 export interface GraphModel {
 	nodes: GNode[];
 	edges: GEdge[];
+	groups: GGroup[];
 	/** Помилки умов: id правила → текст. */
 	errors: Map<string, string>;
 }
@@ -313,7 +325,56 @@ export function buildGraph(
 		});
 	}
 
-	return { nodes, edges, errors };
+	// ---- 6. Групи (як «Групувати» в Bases: окреме значення властивості — окрема група) ----
+	const groups: GGroup[] = [];
+	let paletteIndex = 0;
+	for (const g of tables.groups ?? []) {
+		if (!g.enabled || !g.groupBy) continue;
+		const byKey = new Map<string, { value: unknown; members: number[] }>();
+		for (const [path, i] of index) {
+			const v = getValue(byPath.get(path)!, g.groupBy);
+			const key = groupKey(v);
+			if (key === null) continue;
+			let bucket = byKey.get(key);
+			if (!bucket) byKey.set(key, (bucket = { value: v, members: [] }));
+			bucket.members.push(i);
+		}
+		let sorted: [string, { value: unknown; members: number[] }][];
+		if (g.direction === "MANUAL") {
+			// Вручну: лише вибрані значення, у порядку списку.
+			sorted = [];
+			for (const key of g.order ?? []) {
+				const bucket = byKey.get(key);
+				if (bucket) sorted.push([key, bucket]);
+			}
+		} else {
+			const dir = g.direction === "DESC" ? -1 : 1;
+			sorted = [...byKey].sort((a, b) => compareGroupValues(a[1].value, b[1].value, a[0], b[0]) * dir);
+		}
+		for (const [key, bucket] of sorted) {
+			const c = parseColor(g.color ?? paletteColor(paletteIndex++));
+			const labelColor = g.labelColor === GROUP_COLOR_AUTO ? toCss(c) : g.labelColor;
+			const slot: LabelSlot = { label: null, size: g.labelSize, color: labelColor, background: g.labelBackground };
+			const spec = g.label ?? { type: "value" };
+			let text: string | null;
+			if (spec.type === "value") text = toText(bucket.value) ?? key;
+			else if (spec.type === "property") {
+				// Властивість групи — значення першого члена групи.
+				const first = byPath.get(nodes[bucket.members[0]].id)!;
+				text = readLabel(spec, first);
+			} else text = readLabel(spec, null);
+			groups.push({
+				id: g.id + "\u0000" + key,
+				name: text ?? key,
+				color: c.rgb,
+				alpha: c.alpha,
+				label: text ? labelData(text, slot, GROUP_LABEL_SIZE, theme) : null,
+				members: bucket.members,
+			});
+		}
+	}
+
+	return { nodes, edges, groups, errors };
 }
 
 function edgeLabel(text: string | null, slot: LabelSlot, mode: LabelMode | null, position: number | null, theme: ThemeColors): EdgeLabel | null {
@@ -323,6 +384,32 @@ function edgeLabel(text: string | null, slot: LabelSlot, mode: LabelMode | null,
 		mode: mode ?? "horizontal",
 		position: Math.max(0, Math.min(100, position ?? 50)) / 100,
 	};
+}
+
+/** Ключ групи — значення цілком, як у Bases (список — одна група). Порожнє → null. */
+export function groupKey(v: unknown): string | null {
+	if (v === null || v === undefined || v instanceof NullValue) return null;
+	const s = String(v.toString()).trim();
+	return s ? s : null;
+}
+
+/** Порядок груп: числа — за величиною, решта — за текстом із природним порядком цифр. */
+export function compareGroupValues(a: unknown, b: unknown, ka: string, kb: string): number {
+	const na = a instanceof NumberValue ? toNumber(a) : null;
+	const nb = b instanceof NumberValue ? toNumber(b) : null;
+	if (na !== null && nb !== null) return na - nb;
+	return ka.localeCompare(kb, undefined, { numeric: true, sensitivity: "base" });
+}
+
+/** Усі ключі груп властивості серед записів — у порядку за зростанням (для ручного порядку). */
+export function groupValues(entries: BasesEntry[], property: string): string[] {
+	const byKey = new Map<string, unknown>();
+	for (const e of entries) {
+		const v = getValue(e, property);
+		const key = groupKey(v);
+		if (key !== null && !byKey.has(key)) byKey.set(key, v);
+	}
+	return [...byKey].sort((a, b) => compareGroupValues(a[1], b[1], a[0], b[0])).map(([k]) => k);
 }
 
 function unique(a: string[]): string[] {

@@ -5,6 +5,8 @@ export interface SimForces {
 	repelStrength: number;
 	linkStrength: number;
 	linkDistance: number;
+	groupForce: number;
+	groupSeparation: number;
 }
 
 export interface SimNodeIn {
@@ -18,7 +20,7 @@ export interface SimNodeIn {
 
 export type ToWorker =
 	/** frozen — фізика вимкнена; нові вузли розставляються короткою локальною симуляцією. */
-	| { type: "graph"; nodes: SimNodeIn[]; links: [number, number][]; forces: SimForces; frozen: boolean }
+	| { type: "graph"; nodes: SimNodeIn[]; links: [number, number][]; groups: number[][]; forces: SimForces; frozen: boolean }
 	| { type: "forces"; forces: SimForces }
 	| { type: "frozen"; frozen: boolean }
 	/** rope — «мотузка» (лише в замороженому режимі): сусіди тягнуться за натягнутими зв'язками. */
