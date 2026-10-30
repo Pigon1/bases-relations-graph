@@ -4,6 +4,11 @@ export type FilterTree = string | { and: FilterTree[] } | { or: FilterTree[] } |
 export type Shape = "circle" | "square" | "diamond" | "triangle";
 export type Visibility = "show" | "hide" | "linked";
 
+export type LabelMode = "horizontal" | "tilted";
+
+export const NODE_LABEL_SIZE = 12;
+export const EDGE_LABEL_SIZE = 10;
+
 export type LabelSpec =
 	| { type: "none" }
 	| { type: "property"; property: string }
@@ -34,6 +39,14 @@ export interface NodeRule {
 	sizeProperty: string | null;
 	sizeValue: number | null;
 	label: LabelSpec | null;
+	/**
+	 * Місце підпису: 0 — по центру вузла, 1, 2… — над вузлом (2 над 1), −1, −2… — під ним.
+	 * Каскад підписів іде окремо для кожного індексу; порожньо = −1.
+	 */
+	labelIndex?: number | null;
+	labelSize?: number | null;
+	labelColor?: string | null;
+	labelBackground?: string | null;
 	show: Visibility | null;
 }
 
@@ -55,6 +68,12 @@ export interface EdgeRule {
 	widthProperty: string | null;
 	widthValue: number | null;
 	label: LabelSpec | null;
+	labelMode?: LabelMode | null;
+	/** 0 — біля вузла-джерела, 100 — біля вузла-призначення (відносно напряму правила). */
+	labelPosition?: number | null;
+	labelSize?: number | null;
+	labelColor?: string | null;
+	labelBackground?: string | null;
 }
 
 export interface GraphTables {
@@ -69,6 +88,8 @@ export interface GraphSettings {
 	linkStrength: number;
 	linkDistance: number;
 	labelZoom: number;
+	/** Підписи сталого розміру на екрані (не масштабуються разом із графом). */
+	fixedLabelSize: boolean;
 	savePositions: boolean;
 }
 
@@ -78,6 +99,7 @@ export const DEFAULT_SETTINGS: GraphSettings = {
 	linkStrength: 1,
 	linkDistance: 250,
 	labelZoom: 0.6,
+	fixedLabelSize: false,
 	savePositions: true,
 };
 
@@ -89,6 +111,8 @@ export interface ThemeColors {
 	arrow: string;
 	fillHighlight: string;
 	lineHighlight: string;
+	/** Тло нотатки — типовий колір фону підписів. */
+	background: string;
 }
 
 export function newId(prefix: string): string {
@@ -134,7 +158,8 @@ export function defaultTables(theme: ThemeColors): GraphTables {
 export function emptyNodeRule(): NodeRule {
 	return {
 		id: newId("n"), name: "", enabled: true, condition: null,
-		shape: null, color: null, strokeColor: null, strokeWidth: null, sizeProperty: null, sizeValue: null, label: null, show: null,
+		shape: null, color: null, strokeColor: null, strokeWidth: null, sizeProperty: null, sizeValue: null,
+		label: null, labelIndex: null, labelSize: null, labelColor: null, labelBackground: null, show: null,
 	};
 }
 
@@ -142,6 +167,7 @@ export function emptyEdgeRule(): EdgeRule {
 	return {
 		id: newId("e"), name: "", enabled: true,
 		source: SOURCE_NOTE, sourceValue: null, target: TARGET_ALL_LINKS, targetValue: null,
-		arrowToSource: null, arrowToTarget: null, color: null, widthProperty: null, widthValue: null, label: null,
+		arrowToSource: null, arrowToTarget: null, color: null, widthProperty: null, widthValue: null,
+		label: null, labelMode: null, labelPosition: null, labelSize: null, labelColor: null, labelBackground: null,
 	};
 }

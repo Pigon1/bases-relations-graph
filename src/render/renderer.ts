@@ -1,8 +1,40 @@
 import { Application, Container, Graphics, Text } from "pixi.js";
-import type { GEdge, GNode } from "../model/build";
+import type { GEdge, GNode, LabelData } from "../model/build";
 import { parseColor } from "../model/color";
 import type { ThemeColors } from "../model/types";
 import { SpatialGrid } from "./spatial";
+
+/** Відступ підпису від краю вузла і між підписами в стопці (одиниці світу). */
+const LABEL_NODE_GAP = 3;
+const LABEL_STACK_GAP = 1;
+
+/** Підпис: необов'язковий заокруглений фон + текст. Координати — від лівого верхнього кута. */
+class LabelSprite extends Container {
+	readonly w: number;
+	readonly h: number;
+
+	constructor(d: LabelData, fontFamily: string) {
+		super();
+		const text = new Text({
+			text: d.text,
+			style: { fontFamily, fontSize: d.size, fill: d.color },
+			resolution: 2,
+		});
+		text.alpha = d.alpha;
+		const hasBg = d.backgroundAlpha > 0;
+		const px = hasBg ? d.size * 0.35 : 0, py = hasBg ? d.size * 0.12 : 0;
+		this.w = text.width + px * 2;
+		this.h = text.height + py * 2;
+		if (hasBg) {
+			const bg = new Graphics()
+				.roundRect(0, 0, this.w, this.h, Math.min(this.h / 2, d.size * 0.4))
+				.fill({ color: d.background, alpha: d.backgroundAlpha });
+			this.addChild(bg);
+		}
+		text.position.set(px, py);
+		this.addChild(text);
+	}
+}
 
 export interface RendererCallbacks {
 	onNodeClick(index: number, ev: PointerEvent): void;
@@ -32,8 +64,9 @@ export class GraphRenderer {
 	private edges: GEdge[] = [];
 	private adjacency: number[][] = [];
 	private nodeGfx: Graphics[] = [];
-	private labels: (Text | null)[] = [];
-	private edgeLabels: (Text | null)[] = [];
+	/** Підписи вузлів у порядку node.labels (за зростанням індексу). */
+	private labels: LabelSprite[][] = [];
+	private edgeLabels: (LabelSprite | null)[] = [];
 	private grid = new SpatialGrid();
 	private gridDirty = true;
 	private lastMove = 0;
@@ -59,6 +92,8 @@ export class GraphRenderer {
 	private pinch: { dist: number; scale: number; mx: number; my: number } | null = null;
 
 	labelZoom = 0.6;
+	/** Підписи сталого розміру на екрані: масштаб підпису компенсує зум. */
+	fixedLabelSize = false;
 
 	constructor(private host: HTMLElement, private cb: RendererCallbacks) {}
 
@@ -120,8 +155,8 @@ export class GraphRenderer {
 		}
 
 		for (const g of this.nodeGfx) g.destroy();
-		for (const l of this.labels) l?.destroy();
-		for (const l of this.edgeLabels) l?.destroy();
+		for (const list of this.labels) for (const l of list) l.destroy({ children: true });
+		for (const l of this.edgeLabels) l?.destroy({ children: true });
 		this.nodeLayer.removeChildren();
 		this.labelLayer.removeChildren();
 		this.edgeLabelLayer.removeChildren();
@@ -132,21 +167,15 @@ export class GraphRenderer {
 			this.nodeLayer.addChild(g);
 			return g;
 		});
-		this.labels = nodes.map((n) => (n.label ? this.makeText(n.label, 12, this.labelLayer) : null));
-		this.edgeLabels = edges.map((e) => (e.label ? this.makeText(e.label, 10, this.edgeLabelLayer) : null));
+		this.labels = nodes.map((n) => n.labels.map((d) => this.makeLabel(d, this.labelLayer)));
+		this.edgeLabels = edges.map((e) => (e.label ? this.makeLabel(e.label, this.edgeLabelLayer) : null));
 		this.requestRender();
 	}
 
-	private makeText(text: string, size: number, layer: Container): Text {
-		const t = new Text({
-			text,
-			style: { fontFamily: this.fontFamily, fontSize: size, fill: this.colors.text },
-			resolution: 2,
-		});
-		t.anchor.set(0.5, 0);
-		t.alpha = this.colors.textAlpha;
-		layer.addChild(t);
-		return t;
+	private makeLabel(d: LabelData, layer: Container): LabelSprite {
+		const l = new LabelSprite(d, this.fontFamily);
+		layer.addChild(l);
+		return l;
 	}
 
 	setPositions(pos: Float32Array): void {
@@ -200,6 +229,8 @@ export class GraphRenderer {
 		const hover = this.hover;
 		const related = hover >= 0 ? new Set([hover, ...this.adjacency[hover]]) : null;
 		const showAllLabels = scale >= this.labelZoom;
+		// Множник розміру підписів: 1 — у світі графа, 1/scale — сталий на екрані.
+		const k = this.fixedLabelSize ? 1 / scale : 1;
 
 		// Зв'язки
 		const g = this.edgeGfx;
@@ -211,7 +242,11 @@ export class GraphRenderer {
 			const len = Math.hypot(dx, dy) || 1;
 			const ux = dx / len, uy = dy / len;
 			const rs = nodes[e.s].radius, rt = nodes[e.t].radius;
-			if (len <= rs + rt) continue;
+			const lbl = this.edgeLabels[i];
+			if (len <= rs + rt) {
+				if (lbl) lbl.visible = false;
+				continue;
+			}
 			const x1 = sx + ux * rs, y1 = sy + uy * rs, x2 = tx - ux * rt, y2 = ty - uy * rt;
 			const incident = hover >= 0 && (e.s === hover || e.t === hover);
 			const color = incident ? this.colors.hlLine : e.color;
@@ -223,12 +258,12 @@ export class GraphRenderer {
 			if (e.arrowToTarget) arrow(g, x2, y2, ux, uy, head, color, alpha);
 			if (e.arrowToSource) arrow(g, x1, y1, -ux, -uy, head, color, alpha);
 
-			const lbl = this.edgeLabels[i];
 			if (lbl) {
 				lbl.visible = showAllLabels || incident;
 				if (lbl.visible) {
-					lbl.position.set((x1 + x2) / 2, (y1 + y2) / 2);
-					lbl.alpha = alpha * this.colors.textAlpha;
+					lbl.scale.set(k);
+					this.placeEdgeLabel(lbl, e, sx, sy, ux, uy, len, head, k);
+					lbl.alpha = hover >= 0 && !incident ? 0.2 : 1;
 				}
 			}
 		}
@@ -241,16 +276,83 @@ export class GraphRenderer {
 			const dim = related !== null && !related.has(i);
 			gfx.alpha = dim ? 0.2 : 1;
 			gfx.tint = i === hover ? this.colors.hl : 0xffffff;
-			const lbl = this.labels[i];
-			if (lbl) {
-				lbl.visible = showAllLabels || (related !== null && related.has(i));
-				if (lbl.visible) {
-					lbl.position.set(x, y + nodes[i].radius + 3);
-					lbl.alpha = (dim ? 0.2 : 1) * this.colors.textAlpha;
+			const list = this.labels[i];
+			if (list.length) {
+				const visible = showAllLabels || (related !== null && related.has(i));
+				for (const l of list) {
+					l.visible = visible;
+					l.alpha = dim ? 0.2 : 1;
 				}
+				if (visible) this.placeNodeLabels(i, x, y, k);
 			}
 		}
 		this.app.render();
+	}
+
+	/**
+	 * Стопки підписів вузла: 0 — по центру; 1, 2… — над вузлом, кожен вище попереднього;
+	 * −1, −2… — під вузлом. Пропущені індекси не залишають порожнього місця.
+	 */
+	private placeNodeLabels(i: number, x: number, y: number, k: number): void {
+		const n = this.nodes[i];
+		const list = this.labels[i];
+		const r = n.radius + n.strokeWidth / 2;
+		// Розміри й відступи підпису в одиницях світу з урахуванням множника k.
+		const nodeGap = LABEL_NODE_GAP * k, stackGap = LABEL_STACK_GAP * k;
+		// Над вузлом: індекси за зростанням (1, 2, …).
+		let up = y - r - nodeGap;
+		for (let j = 0; j < list.length; j++) {
+			const idx = n.labels[j].index;
+			const l = list[j];
+			l.scale.set(k);
+			const w = l.w * k, h = l.h * k;
+			if (idx === 0) l.position.set(x - w / 2, y - h / 2);
+			else if (idx > 0) {
+				up -= h;
+				l.position.set(x - w / 2, up);
+				up -= stackGap;
+			}
+		}
+		// Під вузлом: індекси за спаданням (−1, −2, …), тобто з кінця від'ємної частини.
+		let down = y + r + nodeGap;
+		for (let j = list.length - 1; j >= 0; j--) {
+			if (n.labels[j].index >= 0) continue;
+			const l = list[j];
+			l.position.set(x - (l.w * k) / 2, down);
+			down += l.h * k + stackGap;
+		}
+	}
+
+	/**
+	 * Підпис зв'язку. Прилеглість рахується для всього прямокутника підпису:
+	 * при 0% його край торкається вузла-джерела (або стрілки), при 100% — вузла-призначення.
+	 * Нахилений підпис іде вздовж лінії над нею і ніколи не перевертається догори дриґом.
+	 */
+	private placeEdgeLabel(l: LabelSprite, e: GEdge, sx: number, sy: number, ux: number, uy: number, len: number, head: number, k: number): void {
+		const d = e.label!;
+		const ns = this.nodes[e.s], nt = this.nodes[e.t];
+		const tilted = d.mode === "tilted";
+		// Протяжність підпису вздовж лінії (для горизонтального — проєкція прямокутника).
+		const half = (tilted ? l.w / 2 : (Math.abs(ux) * l.w + Math.abs(uy) * l.h) / 2) * k;
+		const a = ns.radius + ns.strokeWidth / 2 + (e.arrowToSource ? head : 0);
+		const b = len - nt.radius - nt.strokeWidth / 2 - (e.arrowToTarget ? head : 0);
+		const c = b - a <= half * 2 ? (a + b) / 2 : a + half + d.position * (b - a - half * 2);
+		const px = sx + ux * c, py = sy + uy * c;
+
+		if (tilted) {
+			let ang = Math.atan2(uy, ux);
+			if (ang > Math.PI / 2) ang -= Math.PI;
+			else if (ang < -Math.PI / 2) ang += Math.PI;
+			l.rotation = ang;
+			// Низ підпису — трохи над лінією.
+			// pivot — у власних одиницях підпису, тому відступ (у світі) ділимо на k.
+			l.pivot.set(l.w / 2, l.h + (e.width / this.scale / 2 + 1) / k);
+		} else {
+			l.rotation = 0;
+			// З фоном підпис стоїть на лінії, без фону — над нею, щоб лінія не перекреслювала текст.
+			l.pivot.set(l.w / 2, d.backgroundAlpha > 0 ? l.h / 2 : l.h + 1 / k);
+		}
+		l.position.set(px, py);
 	}
 
 	// ---------- Введення ----------

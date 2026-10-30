@@ -4,12 +4,34 @@ import { getValue, linkedPaths, toNumber, toText } from "../bases/values";
 import { parseColor } from "./color";
 import {
 	FIXED, LINK_COUNT, SOURCE_NOTE, TARGET_ALL_LINKS,
-	type EdgeRule, type GraphTables, type LabelSpec, type NodeRule, type Shape, type ThemeColors, type Visibility,
+	EDGE_LABEL_SIZE, NODE_LABEL_SIZE,
+	type EdgeRule, type GraphTables, type LabelMode, type LabelSpec, type NodeRule, type Shape, type ThemeColors, type Visibility,
 } from "./types";
+
+export interface LabelData {
+	text: string;
+	size: number;
+	color: number;
+	alpha: number;
+	background: number;
+	/** 0 — без фону. */
+	backgroundAlpha: number;
+}
+
+export interface NodeLabel extends LabelData {
+	index: number;
+}
+
+export interface EdgeLabel extends LabelData {
+	mode: LabelMode;
+	/** 0…1 від вузла s до вузла t. */
+	position: number;
+}
 
 export interface GNode {
 	id: string;
-	label: string | null;
+	/** Відсортовані за індексом. */
+	labels: NodeLabel[];
 	shape: Shape;
 	color: number;
 	alpha: number;
@@ -28,7 +50,7 @@ export interface GEdge {
 	width: number;
 	arrowToSource: boolean;
 	arrowToTarget: boolean;
-	label: string | null;
+	label: EdgeLabel | null;
 	/** Нотатка-з'єднувач, з якої взято зв'язок (для кліку). */
 	connector: string | null;
 }
@@ -66,6 +88,31 @@ function readLabel(spec: LabelSpec | null, entry: BasesEntry | null): string | n
 	if (!spec || spec.type === "none") return null;
 	if (spec.type === "text") return spec.text.trim() || null;
 	return entry ? toText(getValue(entry, spec.property)) : null;
+}
+
+/** Каскадні поля одного підпису. */
+interface LabelSlot {
+	label: LabelSpec | null;
+	size: number | null;
+	color: string | null;
+	background: string | null;
+}
+
+function emptySlot(): LabelSlot {
+	return { label: null, size: null, color: null, background: null };
+}
+
+function labelData(text: string, slot: LabelSlot, defaultSize: number, theme: ThemeColors): LabelData {
+	const c = parseColor(slot.color, parseColor(theme.text));
+	const bg = slot.background ? parseColor(slot.background) : null;
+	return {
+		text,
+		size: Math.max(1, slot.size ?? defaultSize),
+		color: c.rgb,
+		alpha: c.alpha,
+		background: bg?.rgb ?? 0,
+		backgroundAlpha: bg?.alpha ?? 0,
+	};
 }
 
 export function buildGraph(
@@ -136,7 +183,7 @@ export function buildGraph(
 	interface NodeStyle {
 		shape: Shape | null; color: string | null; strokeColor: string | null; strokeWidth: number | null;
 		sizeProperty: string | null; sizeValue: number | null;
-		label: LabelSpec | null; show: Visibility | null;
+		labels: Map<number, LabelSlot>; show: Visibility | null;
 	}
 	const styles = new Map<string, NodeStyle>();
 	const compiled = tables.nodes.map((r) => {
@@ -146,7 +193,7 @@ export function buildGraph(
 	});
 
 	for (const e of entries) {
-		const st: NodeStyle = { shape: null, color: null, strokeColor: null, strokeWidth: null, sizeProperty: null, sizeValue: null, label: null, show: null };
+		const st: NodeStyle = { shape: null, color: null, strokeColor: null, strokeWidth: null, sizeProperty: null, sizeValue: null, labels: new Map(), show: null };
 		tables.nodes.forEach((r: NodeRule, i) => {
 			const c = compiled[i];
 			if (!c || !c.test(e)) return;
@@ -156,7 +203,16 @@ export function buildGraph(
 			if (r.strokeWidth != null) st.strokeWidth = r.strokeWidth;
 			if (r.sizeProperty !== null) st.sizeProperty = r.sizeProperty;
 			if (r.sizeValue !== null) st.sizeValue = r.sizeValue;
-			if (r.label !== null) st.label = r.label;
+			// Рядок стосується підпису, якщо задає хоч одне його поле; індекс — ключ каскаду.
+			if (r.label != null || r.labelIndex != null || r.labelSize != null || r.labelColor != null || r.labelBackground != null) {
+				const idx = Math.round(r.labelIndex ?? -1);
+				let slot = st.labels.get(idx);
+				if (!slot) st.labels.set(idx, (slot = emptySlot()));
+				if (r.label != null) slot.label = r.label;
+				if (r.labelSize != null) slot.size = r.labelSize;
+				if (r.labelColor != null) slot.color = r.labelColor;
+				if (r.labelBackground != null) slot.background = r.labelBackground;
+			}
 			if (r.show !== null) st.show = r.show;
 		});
 		const show = st.show ?? "show";
@@ -190,10 +246,15 @@ export function buildGraph(
 			const n = toNumber(getValue(e, sp));
 			radius = n === null ? nativeRadius(degree.get(path) ?? 0) : mult * n;
 		}
+		const labels: NodeLabel[] = [];
+		for (const [idx, slot] of [...st.labels].sort((a, b) => a[0] - b[0])) {
+			const text = readLabel(slot.label, e);
+			if (text) labels.push({ index: idx, ...labelData(text, slot, NODE_LABEL_SIZE, theme) });
+		}
 		index.set(path, nodes.length);
 		nodes.push({
 			id: path,
-			label: readLabel(st.label, e),
+			labels,
 			shape: st.shape ?? "circle",
 			color: c.rgb,
 			alpha: c.alpha,
@@ -211,12 +272,20 @@ export function buildGraph(
 		let color: string | null = null, widthProperty: string | null = null, widthValue: number | null = null;
 		let label: LabelSpec | null = null, toSrc: boolean | null = null, toTgt: boolean | null = null;
 		let owner: BasesEntry | null = null, connector: string | null = null;
+		const slot = emptySlot();
+		let mode: LabelMode | null = null, position: number | null = null;
 		for (const m of p.matches) {
 			const r = m.rule;
 			if (r.color !== null) color = r.color;
 			if (r.widthProperty !== null) { widthProperty = r.widthProperty; owner = m.owner; }
 			if (r.widthValue !== null) widthValue = r.widthValue;
 			if (r.label !== null) { label = r.label; owner = m.owner; }
+			if (r.labelMode != null) mode = r.labelMode;
+			// Позиція задана відносно напряму правила — переводимо в напрям s → t.
+			if (r.labelPosition != null) position = m.forward ? r.labelPosition : 100 - r.labelPosition;
+			if (r.labelSize != null) slot.size = r.labelSize;
+			if (r.labelColor != null) slot.color = r.labelColor;
+			if (r.labelBackground != null) slot.background = r.labelBackground;
 			// Стрілки задано відносно напряму правила.
 			const aSrc = m.forward ? r.arrowToSource : r.arrowToTarget;
 			const aTgt = m.forward ? r.arrowToTarget : r.arrowToSource;
@@ -239,12 +308,21 @@ export function buildGraph(
 			width: Math.max(0.1, width),
 			arrowToSource: toSrc ?? false,
 			arrowToTarget: toTgt ?? false,
-			label: readLabel(label, owner),
+			label: edgeLabel(readLabel(label, owner), slot, mode, position, theme),
 			connector,
 		});
 	}
 
 	return { nodes, edges, errors };
+}
+
+function edgeLabel(text: string | null, slot: LabelSlot, mode: LabelMode | null, position: number | null, theme: ThemeColors): EdgeLabel | null {
+	if (!text) return null;
+	return {
+		...labelData(text, slot, EDGE_LABEL_SIZE, theme),
+		mode: mode ?? "horizontal",
+		position: Math.max(0, Math.min(100, position ?? 50)) / 100,
+	};
 }
 
 function unique(a: string[]): string[] {

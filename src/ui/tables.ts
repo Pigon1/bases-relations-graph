@@ -161,15 +161,26 @@ const SHOW: PickItem[] = [
 	{ value: "linked", label: "Only if linked", icon: "lucide-link" },
 ];
 const ARROW: Opt[] = [["true", "Yes"], ["false", "No"]];
+const LABEL_MODES: PickItem[] = [
+	{ value: "horizontal", label: "Horizontal", icon: "lucide-move-horizontal" },
+	{ value: "tilted", label: "Along the link", icon: "lucide-trending-up" },
+];
+
+/** Спільні колонки оформлення підпису: розмір, колір, фон. */
+function labelStyleCells(tr: HTMLElement, ctx: TablesContext, r: { labelSize?: number | null; labelColor?: string | null; labelBackground?: string | null }): void {
+	numberCell(tr.createEl("td"), r.labelSize ?? null, (v) => { r.labelSize = v; ctx.onChange(false); });
+	colorCell(tr.createEl("td"), r.labelColor ?? null, ctx.theme.text, (v) => { r.labelColor = v; ctx.onChange(false); });
+	colorCell(tr.createEl("td"), r.labelBackground ?? null, ctx.theme.background, (v) => { r.labelBackground = v; ctx.onChange(false); });
+}
 
 // ---------- Таблиця «Nodes» ----------
 
 export function renderNodesTable(el: HTMLElement, tables: GraphTables, ctx: TablesContext): void {
 	el.empty();
-	el.createDiv({ cls: "bases-graph-hint", text: "Rows apply top to bottom: a later row overrides earlier ones in every field it sets. “—” means inherit." });
+	el.createDiv({ cls: "bases-graph-hint", text: "Rows apply top to bottom: a later row overrides earlier ones in every field it sets. “—” means inherit. Each row describes one label; its index sets the place: 0 — node center, 1, 2… — above the node, −1, −2… — below it (empty = −1). Rows with the same index override each other, different indices add more labels." });
 	const scroll = el.createDiv({ cls: "bases-graph-table-scroll" });
 	const table = scroll.createEl("table", { cls: "bases-graph-table" });
-	header(table, ["#", "", "Name", "Condition", "Shape", "Color", "Stroke", "Stroke width", "Size by", "Size value", "Label", "Visibility", ""]);
+	header(table, ["#", "", "Name", "Condition", "Shape", "Color", "Stroke", "Stroke width", "Size by", "Size value", "Label", "Label index", "Font size", "Font color", "Label background", "Visibility", ""]);
 	const body = table.createEl("tbody");
 	const rows = tables.nodes;
 	const sizeItems = (): PickItem[] => [
@@ -189,6 +200,8 @@ export function renderNodesTable(el: HTMLElement, tables: GraphTables, ctx: Tabl
 		pickerCell(tr.createEl("td"), sizeItems, r.sizeProperty, true, (v) => { r.sizeProperty = v; ctx.onChange(false); });
 		numberCell(tr.createEl("td"), r.sizeValue, (v) => { r.sizeValue = v; ctx.onChange(false); });
 		labelCell(tr.createEl("td"), ctx, r.label, (v) => { r.label = v; ctx.onChange(false); });
+		numberCell(tr.createEl("td"), r.labelIndex ?? null, (v) => { r.labelIndex = v === null ? null : Math.round(v); ctx.onChange(false); });
+		labelStyleCells(tr, ctx, r);
 		pickerCell(tr.createEl("td"), () => SHOW, r.show, true, (v) => { r.show = v as NodeRule["show"]; ctx.onChange(false); });
 		deleteCell(tr, rows, i, ctx);
 	});
@@ -206,7 +219,7 @@ export function renderEdgesTable(el: HTMLElement, tables: GraphTables, ctx: Tabl
 	el.createDiv({ cls: "bases-graph-hint", text: "Each row creates links. Source “Note” uses the note's own links; a property source turns the note into a connector that links the source value to the target values. Links not described here are not shown." });
 	const scroll = el.createDiv({ cls: "bases-graph-table-scroll" });
 	const table = scroll.createEl("table", { cls: "bases-graph-table" });
-	header(table, ["#", "", "Name", "Source", "Source value", "Target", "Target value", "Arrow to source", "Arrow to target", "Color", "Width by", "Width value", "Label", ""]);
+	header(table, ["#", "", "Name", "Source", "Source value", "Target", "Target value", "Arrow to source", "Arrow to target", "Color", "Width by", "Width value", "Label", "Label mode", "Label position, %", "Font size", "Font color", "Label background", ""]);
 	const body = table.createEl("tbody");
 	const rows = tables.edges;
 	const sourceItems = (): PickItem[] => [{ value: SOURCE_NOTE, label: "Note", icon: "lucide-file-text" }, ...propItems(ctx, true)];
@@ -226,6 +239,9 @@ export function renderEdgesTable(el: HTMLElement, tables: GraphTables, ctx: Tabl
 		pickerCell(tr.createEl("td"), widthItems, r.widthProperty, true, (v) => { r.widthProperty = v; ctx.onChange(false); });
 		numberCell(tr.createEl("td"), r.widthValue, (v) => { r.widthValue = v; ctx.onChange(false); });
 		labelCell(tr.createEl("td"), ctx, r.label, (v) => { r.label = v; ctx.onChange(false); });
+		pickerCell(tr.createEl("td"), () => LABEL_MODES, r.labelMode ?? null, true, (v) => { r.labelMode = v as EdgeRule["labelMode"]; ctx.onChange(false); });
+		numberCell(tr.createEl("td"), r.labelPosition ?? null, (v) => { r.labelPosition = v === null ? null : Math.max(0, Math.min(100, v)); ctx.onChange(false); });
+		labelStyleCells(tr, ctx, r);
 		deleteCell(tr, rows, i, ctx);
 	});
 

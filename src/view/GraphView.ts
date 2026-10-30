@@ -113,6 +113,7 @@ export class GraphView extends BasesView {
 				displayName: "Display",
 				items: [
 					{ type: "slider", key: "labelZoom", displayName: "Show labels from zoom", min: 0.05, max: 3, step: 0.05, default: DEFAULT_SETTINGS.labelZoom },
+					{ type: "toggle", key: "fixedLabelSize", displayName: "Constant label size on screen", default: DEFAULT_SETTINGS.fixedLabelSize },
 					{ type: "toggle", key: "savePositions", displayName: "Remember node positions", default: DEFAULT_SETTINGS.savePositions },
 				],
 			},
@@ -217,6 +218,7 @@ export class GraphView extends BasesView {
 		const entries = this.data?.data ?? [];
 		const settings = this.settings();
 		this.renderer.labelZoom = settings.labelZoom;
+		this.renderer.fixedLabelSize = settings.fixedLabelSize;
 
 		const model = buildGraph(entries, this.tables, this.ev, this.theme);
 		const errorsChanged = !this.model || [...model.errors].join() !== [...this.model.errors].join();
