@@ -1,11 +1,11 @@
-.bases-graph {
+.bases-relations-graph {
 	display: flex;
 	flex-direction: column;
 	height: 100%;
 	min-height: 300px;
 }
 
-.bases-graph-toolbar {
+.bases-relations-graph-toolbar {
 	display: flex;
 	align-items: center;
 	gap: var(--size-4-2);
@@ -14,14 +14,14 @@
 	flex-wrap: wrap;
 }
 
-.bases-graph-segmented {
+.bases-relations-graph-segmented {
 	display: flex;
 	border: var(--border-width) solid var(--background-modifier-border);
 	border-radius: var(--radius-s);
 	overflow: hidden;
 }
 
-.bases-graph-seg {
+.bases-relations-graph-seg {
 	display: flex;
 	align-items: center;
 	gap: var(--size-4-1);
@@ -31,59 +31,68 @@
 	font-size: var(--font-ui-small);
 }
 
-.bases-graph-seg .svg-icon {
+.bases-relations-graph-seg .svg-icon {
 	width: var(--icon-s);
 	height: var(--icon-s);
 }
 
-.bases-graph-seg.is-active {
+.bases-relations-graph-seg.is-active {
 	background: var(--interactive-accent);
 	color: var(--text-on-accent);
 }
 
-.bases-graph-status {
+.bases-relations-graph-status {
 	flex: 1;
 	color: var(--text-muted);
 	font-size: var(--font-ui-smaller);
 	text-align: right;
 }
 
-.bases-graph-canvas-host {
+.bases-relations-graph-canvas-host {
 	flex: 1;
 	position: relative;
 	overflow: hidden;
 	min-height: 0;
 }
 
-.bases-graph-canvas {
+.bases-relations-graph-canvas {
 	position: absolute;
 	inset: 0;
 	display: block;
+	touch-action: none;
 }
 
-.bases-graph-tables {
+.bases-relations-graph-canvas.is-hovering-node {
+	cursor: pointer;
+}
+
+.bases-relations-graph-theme-bg-probe {
+	color: var(--background-primary);
+}
+
+.bases-relations-graph-tables {
 	flex: 1;
 	overflow: auto;
 	padding: var(--size-4-2);
 }
 
-.bases-graph-hint {
+.bases-relations-graph-hint {
 	color: var(--text-muted);
 	font-size: var(--font-ui-smaller);
 	margin-bottom: var(--size-4-2);
 }
 
-.bases-graph-table-scroll {
+.bases-relations-graph-table-scroll {
 	overflow-x: auto;
 }
 
-.bases-graph-table {
+.bases-relations-graph-table {
 	border-collapse: collapse;
 	font-size: var(--font-ui-small);
 	width: max-content;
 }
 
-.bases-graph-table th {
+.bases-relations-graph-table th {
 	text-align: left;
 	font-weight: var(--font-semibold);
 	color: var(--text-muted);
@@ -92,50 +101,50 @@
 	white-space: nowrap;
 }
 
-.bases-graph-table td {
+.bases-relations-graph-table td {
 	padding: var(--size-4-1) var(--size-4-2);
 	border-bottom: var(--border-width) solid var(--background-modifier-border);
 	vertical-align: middle;
 }
 
-.bases-graph-table tr.has-error .bases-graph-name {
+.bases-relations-graph-table tr.has-error .bases-relations-graph-name {
 	border-color: var(--text-error);
 }
 
-.bases-graph-order {
+.bases-relations-graph-order {
 	white-space: nowrap;
 }
 
-.bases-graph-order span {
+.bases-relations-graph-order span {
 	display: inline-block;
 	min-width: 1.5em;
 	color: var(--text-muted);
 }
 
-.bases-graph-name {
+.bases-relations-graph-name {
 	width: 9em;
 }
 
-.bases-graph-num {
+.bases-relations-graph-num {
 	width: 5em;
 }
 
-.bases-graph-label-text {
+.bases-relations-graph-label-text {
 	width: 8em;
 	margin-left: var(--size-4-1);
 }
 
-.bases-graph-color {
+.bases-relations-graph-color {
 	display: flex;
 	align-items: center;
 	gap: var(--size-4-1);
 }
 
-.bases-graph-color input[type="range"] {
+.bases-relations-graph-color input[type="range"] {
 	width: 5em;
 }
 
-.bases-graph-cond-btn {
+.bases-relations-graph-cond-btn {
 	max-width: 18em;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -144,24 +153,24 @@
 	font-size: var(--font-ui-smaller);
 }
 
-.bases-graph-add {
+.bases-relations-graph-add {
 	margin-top: var(--size-4-2);
 }
 
 /* Редактор умов */
 
-.bases-graph-condition-modal {
+.bases-relations-graph-condition-modal {
 	width: min(760px, 95vw);
 }
 
-.bases-graph-cond-group {
+.bases-relations-graph-cond-group {
 	border-left: 2px solid var(--background-modifier-border);
 	padding-left: var(--size-4-2);
 	margin: var(--size-4-1) 0;
 }
 
-.bases-graph-cond-head,
-.bases-graph-cond-row {
+.bases-relations-graph-cond-head,
+.bases-relations-graph-cond-row {
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--size-4-1);
@@ -169,31 +178,31 @@
 	margin: var(--size-4-1) 0;
 }
 
-.bases-graph-cond-value {
+.bases-relations-graph-cond-value {
 	flex: 1;
 	min-width: 8em;
 }
 
-.bases-graph-cond-raw {
+.bases-relations-graph-cond-raw {
 	flex: 1;
 	min-width: 14em;
 	font-family: var(--font-monospace);
 }
 
-.bases-graph-condition-error {
+.bases-relations-graph-condition-error {
 	color: var(--text-error);
 	font-size: var(--font-ui-smaller);
 	min-height: 1.2em;
 	margin: var(--size-4-2) 0;
 }
 
-.is-mobile .bases-graph-seg span:not(.svg-icon):not(:has(svg)) {
+.is-mobile .bases-relations-graph-seg span:not(.svg-icon):not(:has(svg)) {
 	display: none;
 }
 
 /* Вибір з іконками */
 
-.bases-graph-picker {
+.bases-relations-graph-picker {
 	display: inline-flex;
 	align-items: center;
 	gap: var(--size-4-1);
@@ -201,46 +210,46 @@
 	font-size: var(--font-ui-small);
 }
 
-.bases-graph-picker.is-inherit {
+.bases-relations-graph-picker.is-inherit {
 	color: var(--text-faint);
 }
 
-.bases-graph-picker-icon,
-.bases-graph-picker-chevron {
+.bases-relations-graph-picker-icon,
+.bases-relations-graph-picker-chevron {
 	display: inline-flex;
 	color: var(--text-muted);
 }
 
-.bases-graph-picker-icon:empty {
+.bases-relations-graph-picker-icon:empty {
 	display: none;
 }
 
-.bases-graph-picker-icon .svg-icon,
-.bases-graph-picker-chevron .svg-icon {
+.bases-relations-graph-picker-icon .svg-icon,
+.bases-relations-graph-picker-chevron .svg-icon {
 	width: var(--icon-xs);
 	height: var(--icon-xs);
 }
 
-.bases-graph-picker-label {
+.bases-relations-graph-picker-label {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
 
-.bases-graph-cond-btn {
+.bases-relations-graph-cond-btn {
 	display: inline-flex;
 	align-items: center;
 	gap: var(--size-4-1);
 }
 
-.menu.bases-graph-menu {
+.menu.bases-relations-graph-menu {
 	max-height: 60vh;
 	overflow-y: auto;
 }
 
 /* Групи */
 
-.bases-graph-legend {
+.bases-relations-graph-legend {
 	position: absolute;
 	left: var(--size-4-3);
 	bottom: var(--size-4-3);
@@ -257,27 +266,31 @@
 	z-index: 1;
 }
 
-.bases-graph-legend-item {
+.bases-relations-graph-legend-item {
 	display: inline-flex;
 	align-items: center;
 	gap: var(--size-4-1);
 }
 
-.bases-graph-legend-dot,
-.bases-graph-swatch {
+.bases-relations-graph-legend-dot,
+.bases-relations-graph-swatch {
 	display: inline-block;
 	width: 10px;
 	height: 10px;
 	border-radius: 50%;
 }
 
-.bases-graph-swatch {
+.bases-relations-graph-legend-dot {
+	background: var(--bases-relations-graph-dot-color);
+}
+
+.bases-relations-graph-swatch {
 	margin-right: var(--size-4-1);
 }
 
 /* Ручний порядок груп */
 
-.bases-graph-order-btn {
+.bases-relations-graph-order-btn {
 	display: inline-flex;
 	align-items: center;
 	gap: var(--size-4-1);
@@ -285,22 +298,22 @@
 	font-size: var(--font-ui-smaller);
 }
 
-.bases-graph-order-modal {
+.bases-relations-graph-order-modal {
 	width: min(420px, 95vw);
 }
 
-.bases-graph-order-bar {
+.bases-relations-graph-order-bar {
 	display: flex;
 	justify-content: flex-end;
 	margin-bottom: var(--size-4-2);
 }
 
-.bases-graph-order-list {
+.bases-relations-graph-order-list {
 	max-height: 60vh;
 	overflow-y: auto;
 }
 
-.bases-graph-order-row {
+.bases-relations-graph-order-row {
 	display: flex;
 	align-items: center;
 	gap: var(--size-4-2);
@@ -308,32 +321,82 @@
 	border-radius: var(--radius-s);
 }
 
-.bases-graph-order-row:hover {
+.bases-relations-graph-order-row:hover {
 	background: var(--background-modifier-hover);
 }
 
-.bases-graph-order-row.is-hidden .bases-graph-order-value {
+.bases-relations-graph-order-row.is-hidden .bases-relations-graph-order-value {
 	color: var(--text-faint);
 }
 
-.bases-graph-order-row.is-dragging {
+.bases-relations-graph-order-row.is-dragging {
 	opacity: 0.4;
 }
 
-.bases-graph-order-row.is-drop-target {
+.bases-relations-graph-order-row.is-drop-target {
 	box-shadow: inset 0 2px 0 var(--interactive-accent);
 }
 
-.bases-graph-order-handle {
+.bases-relations-graph-order-handle {
 	display: inline-flex;
 	width: var(--icon-s);
 	color: var(--text-faint);
 	cursor: grab;
 }
 
-.bases-graph-order-value {
+.bases-relations-graph-order-value {
 	flex: 1;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+/* Дерево */
+
+.bases-relations-graph-treebar {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+}
+
+.bases-relations-graph-canvas-host.is-picking-root canvas {
+	cursor: crosshair !important;
+}
+
+/* Згортання груп */
+
+.bases-relations-graph-legend-item {
+	pointer-events: auto;
+	cursor: pointer;
+	border-radius: var(--radius-s);
+	padding: 0 var(--size-2-2);
+}
+
+.bases-relations-graph-legend-item:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.bases-relations-graph-legend-item.is-collapsed .bases-relations-graph-legend-dot {
+	background: transparent !important;
+	box-shadow: inset 0 0 0 2px currentColor;
+}
+
+.bases-relations-graph-legend-item.is-collapsed span:last-child {
+	font-style: italic;
+}
+
+/* Налаштування гарячих клавіш */
+
+.bases-relations-graph-hotkey-list {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--size-4-1);
+}
+
+.bases-relations-graph-hotkey-empty {
+	color: var(--text-faint);
+	font-size: var(--font-ui-small);
+	padding: 0 var(--size-4-1);
 }

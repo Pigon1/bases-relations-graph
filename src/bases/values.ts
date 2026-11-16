@@ -4,7 +4,7 @@ import { FileValue, LinkValue, ListValue, NullValue, NumberValue, type BasesEntr
 
 /** LinkValue.resolve() є в рантаймі (1.10+), але не в публічних типах. */
 function resolveLink(v: LinkValue): TFile | null {
-	return (v as unknown as { resolve(): TFile | null }).resolve();
+	return (v as unknown as { resolve?(): TFile | null }).resolve?.() ?? null;
 }
 
 export function getValue(entry: BasesEntry, id: string): unknown {
@@ -31,8 +31,7 @@ export function linkedPaths(v: unknown, out: string[] = []): string[] {
 		const f = resolveLink(v);
 		if (f) out.push(f.path);
 	} else if (v instanceof FileValue) {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const f = (v as any).file;
+		const f = (v as unknown as { file?: TFile }).file;
 		if (f?.path) out.push(f.path);
 	}
 	return out;
@@ -42,8 +41,7 @@ export function linkedPaths(v: unknown, out: string[] = []): string[] {
 export function toNumber(v: unknown): number | null {
 	if (v === null || v === undefined || v instanceof NullValue) return null;
 	if (v instanceof NumberValue) {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const n = (v as any).data;
+		const n = (v as unknown as { data?: number }).data;
 		return typeof n === "number" && isFinite(n) ? n : null;
 	}
 	if (v instanceof ListValue) return v.length();

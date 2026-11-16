@@ -22,19 +22,19 @@ export function createPicker(
 	opts: { inherit?: boolean; placeholder?: string },
 	onChange: (value: string | null) => void,
 ): Picker {
-	const btn = parent.createEl("button", { cls: "bases-graph-picker" });
+	const btn = parent.createEl("button", { cls: "bases-relations-graph-picker" });
 	let current = value;
 	const list = () => (typeof items === "function" ? items() : items);
 
 	const paint = () => {
 		btn.empty();
 		const item = list().find((i) => i.value === current);
-		const icon = btn.createSpan({ cls: "bases-graph-picker-icon" });
+		const icon = btn.createSpan({ cls: "bases-relations-graph-picker-icon" });
 		if (item) setIcon(icon, item.icon);
 		else if (current !== null) setIcon(icon, "lucide-circle-help");
 		const text = item ? item.label : current === null ? opts.placeholder ?? "—" : current;
-		btn.createSpan({ cls: "bases-graph-picker-label", text });
-		setIcon(btn.createSpan({ cls: "bases-graph-picker-chevron" }), "lucide-chevron-down");
+		btn.createSpan({ cls: "bases-relations-graph-picker-label", text });
+		setIcon(btn.createSpan({ cls: "bases-relations-graph-picker-chevron" }), "lucide-chevron-down");
 		btn.toggleClass("is-inherit", current === null);
 		btn.setAttr("aria-label", text);
 	};
@@ -55,8 +55,7 @@ export function createPicker(
 		for (const it of list()) {
 			menu.addItem((mi) => mi.setTitle(it.label).setIcon(it.icon).setChecked(it.value === current).onClick(() => select(it.value)));
 		}
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		(menu as any).dom?.addClass("bases-graph-menu");
+		(menu as unknown as { dom?: HTMLElement }).dom?.addClass("bases-relations-graph-menu");
 		const r = btn.getBoundingClientRect();
 		menu.showAtPosition({ x: r.left, y: r.bottom });
 	};

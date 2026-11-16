@@ -12,7 +12,14 @@ export class GroupOrderModal extends Modal {
 	private listEl!: HTMLElement;
 	private dragFrom = -1;
 
-	constructor(app: App, title: string, values: string[], order: string[], private onChangeOrder: (order: string[]) => void) {
+	constructor(
+		app: App,
+		title: string,
+		values: string[],
+		order: string[],
+		private onChangeOrder: (order: string[]) => void,
+		private onClosed?: () => void,
+	) {
 		super(app);
 		this.titleEl.setText(title);
 		const present = new Set(values);
@@ -23,8 +30,8 @@ export class GroupOrderModal extends Modal {
 	}
 
 	onOpen(): void {
-		this.modalEl.addClass("bases-graph-order-modal");
-		const bar = this.contentEl.createDiv({ cls: "bases-graph-order-bar" });
+		this.modalEl.addClass("bases-relations-graph-order-modal");
+		const bar = this.contentEl.createDiv({ cls: "bases-relations-graph-order-bar" });
 		const toggleAll = bar.createEl("button");
 		const updateToggle = () => {
 			const any = this.shown.length > 0;
@@ -39,8 +46,13 @@ export class GroupOrderModal extends Modal {
 			updateToggle();
 		};
 		updateToggle();
-		this.listEl = this.contentEl.createDiv({ cls: "bases-graph-order-list" });
+		this.listEl = this.contentEl.createDiv({ cls: "bases-relations-graph-order-list" });
 		this.render();
+	}
+
+	onClose(): void {
+		this.contentEl.empty();
+		this.onClosed?.();
 	}
 
 	private changed(): void {
@@ -52,7 +64,7 @@ export class GroupOrderModal extends Modal {
 		const el = this.listEl;
 		el.empty();
 		if (!this.shown.length && !this.hidden.length) {
-			el.createDiv({ cls: "bases-graph-hint", text: "No values for this property." });
+			el.createDiv({ cls: "bases-relations-graph-hint", text: "No values for this property." });
 			return;
 		}
 		this.shown.forEach((v, i) => this.row(el, v, true, i));
@@ -60,8 +72,8 @@ export class GroupOrderModal extends Modal {
 	}
 
 	private row(parent: HTMLElement, value: string, checked: boolean, index: number): void {
-		const row = parent.createDiv({ cls: "bases-graph-order-row" + (checked ? "" : " is-hidden") });
-		const handle = row.createSpan({ cls: "bases-graph-order-handle" });
+		const row = parent.createDiv({ cls: "bases-relations-graph-order-row" + (checked ? "" : " is-hidden") });
+		const handle = row.createSpan({ cls: "bases-relations-graph-order-handle" });
 		if (checked) {
 			setIcon(handle, "lucide-grip-vertical");
 			row.draggable = true;
@@ -90,7 +102,7 @@ export class GroupOrderModal extends Modal {
 			}
 			this.changed();
 		};
-		row.createSpan({ cls: "bases-graph-order-value", text: value });
+		row.createSpan({ cls: "bases-relations-graph-order-value", text: value });
 		if (checked) {
 			// Кнопки для сенсорних екранів, де перетягування в списку незручне.
 			const up = row.createEl("button", { cls: "clickable-icon", attr: { "aria-label": "Move up" } });

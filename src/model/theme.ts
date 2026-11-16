@@ -22,8 +22,7 @@ export function readThemeColors(): ThemeColors {
 		out[key] = toCss({ rgb: c.rgb, alpha: c.alpha * (isNaN(opacity) ? 1 : opacity) });
 	}
 	// Тло: змінна теми може бути у будь-якому форматі CSS — нормалізуємо через computed style.
-	const bg = document.body.createDiv();
-	bg.style.color = "var(--background-primary)";
+	const bg = document.body.createDiv({ cls: "bases-relations-graph-theme-bg-probe" });
 	out.background = toCss({ ...parseColor(getComputedStyle(bg).color, { rgb: 0xffffff, alpha: 1 }), alpha: 0.85 });
 	bg.detach();
 	return out;

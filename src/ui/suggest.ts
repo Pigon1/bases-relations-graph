@@ -58,9 +58,8 @@ export class VaultValues {
 
 	propertyNames(): string[] {
 		return this.memo("propNames", () => {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			const infos = (this.app.metadataCache as any).getAllPropertyInfos?.();
-			if (infos) return Object.values(infos as Record<string, { name: string }>).map((i) => i.name).sort(collate);
+			const infos = (this.app.metadataCache as unknown as { getAllPropertyInfos?(): Record<string, { name: string }> }).getAllPropertyInfos?.();
+			if (infos) return Object.values(infos).map((i) => i.name).sort(collate);
 			const names = new Set<string>();
 			for (const f of this.app.vault.getMarkdownFiles()) {
 				const fm = this.app.metadataCache.getFileCache(f)?.frontmatter;

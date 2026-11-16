@@ -129,7 +129,8 @@ export interface GraphTables {
 }
 
 /** Налаштування подання (опції Bases). */
-export type LayoutKind = "force" | "frozen";
+export type LayoutKind = "force" | "frozen" | "tree";
+export type TreeLinkStyle = "curved" | "straight" | "orthogonal";
 
 export interface GraphSettings {
 	/** force — жива фізика; frozen — фізика вимкнена, вузли стоять, де їх поставили. */
@@ -144,6 +145,12 @@ export interface GraphSettings {
 	/** Відштовхування груп одна від одної (0–1). */
 	groupSeparation: number;
 	showLegend: boolean;
+	/** Дерево: відстань між рівнями і між сусідами в рівні. */
+	treeLevelGap: number;
+	treeSiblingGap: number;
+	treeLinkStyle: TreeLinkStyle;
+	/** Дерево: члени групи, ближчі за стільки «клітинок», обводяться разом (мінімум 1). */
+	groupStretch: number;
 	/** Підписи сталого розміру на екрані (не масштабуються разом із графом). */
 	fixedLabelSize: boolean;
 	savePositions: boolean;
@@ -159,6 +166,10 @@ export const DEFAULT_SETTINGS: GraphSettings = {
 	groupForce: 0.3,
 	groupSeparation: 0.5,
 	showLegend: true,
+	treeLevelGap: 150,
+	treeSiblingGap: 30,
+	treeLinkStyle: "curved",
+	groupStretch: 2,
 	fixedLabelSize: false,
 	savePositions: true,
 };

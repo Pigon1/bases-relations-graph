@@ -10,7 +10,7 @@ export class SimClient {
 		this.url = URL.createObjectURL(new Blob([workerCode], { type: "text/javascript" }));
 		this.worker = new Worker(this.url);
 		this.worker.onmessage = (e: MessageEvent<FromWorker>) => onMessage(e.data);
-		this.worker.onerror = (e) => console.error("[bases-graph] simulation worker error", e);
+		this.worker.onerror = (e) => console.error("[bases-relations-graph] simulation worker error", e);
 	}
 
 	send(m: ToWorker): void {

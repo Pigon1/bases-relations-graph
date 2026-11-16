@@ -1,48 +1,53 @@
-import { normalizePath, type DataAdapter } from "obsidian";
-
 /** [x, y, закріплено ? 1 : 0] */
 export type SavedPos = [number, number, number];
-
-interface FileData {
-	key: string;
-	positions: Record<string, SavedPos>;
-}
 
 const SAVE_DELAY = 2000;
 
 /**
- * Позиції вузлів — окремий файл на кожне подання в теці плагіна,
- * щоб не роздувати .base і data.json. Ключ: шлях бази + назва подання.
+ * Позиції вузлів для кожного подання (ключ: шлях бази + назва подання).
+ * Зберігаються через стандартний механізм даних плагіна (loadData / saveData)
+ * із відкладеним записом, щоб не навантажувати диск під час симуляції.
  */
 export class PositionStore {
 	private cache = new Map<string, Map<string, SavedPos>>();
-	private dirty = new Set<string>();
+	private dirty = false;
 	private timer: number | null = null;
 
-	constructor(private adapter: DataAdapter, private dir: string) {}
+	constructor(private onFlush: () => Promise<void>) {}
 
 	static key(basePath: string, viewName: string): string {
 		return basePath + "::" + viewName;
 	}
 
-	private file(key: string): string {
-		return normalizePath(`${this.dir}/positions/${hash(key)}.json`);
+	init(raw: Record<string, Record<string, SavedPos>> | undefined): void {
+		if (!raw || typeof raw !== "object") return;
+		for (const [key, positions] of Object.entries(raw)) {
+			if (!positions || typeof positions !== "object") continue;
+			const existing = this.cache.get(key);
+			if (!existing) {
+				this.cache.set(key, new Map(Object.entries(positions)));
+			} else {
+				for (const [id, pos] of Object.entries(positions)) {
+					if (!existing.has(id)) existing.set(id, pos);
+				}
+			}
+		}
+	}
+
+	toJSON(): Record<string, Record<string, SavedPos>> {
+		const out: Record<string, Record<string, SavedPos>> = {};
+		for (const [key, map] of this.cache) {
+			if (map.size) out[key] = Object.fromEntries(map);
+		}
+		return out;
 	}
 
 	async load(key: string): Promise<Map<string, SavedPos>> {
-		const cached = this.cache.get(key);
-		if (cached) return cached;
-		let map = new Map<string, SavedPos>();
-		try {
-			const path = this.file(key);
-			if (await this.adapter.exists(path)) {
-				const data = JSON.parse(await this.adapter.read(path)) as FileData;
-				map = new Map(Object.entries(data.positions ?? {}));
-			}
-		} catch (e) {
-			console.warn("[bases-graph] failed to read positions", e);
+		let map = this.cache.get(key);
+		if (!map) {
+			map = new Map<string, SavedPos>();
+			this.cache.set(key, map);
 		}
-		this.cache.set(key, map);
 		return map;
 	}
 
@@ -55,82 +60,54 @@ export class PositionStore {
 			map.set(ids[i], [x, y, pinned ? pinned[i] : prevPinned]);
 		}
 		this.cache.set(key, map);
-		this.markDirty(key);
+		this.markDirty();
 	}
 
 	setPinned(key: string, id: string, x: number, y: number, pinned: boolean): void {
 		const map = this.cache.get(key) ?? new Map<string, SavedPos>();
 		map.set(id, [x, y, pinned ? 1 : 0]);
 		this.cache.set(key, map);
-		this.markDirty(key);
+		this.markDirty();
 	}
 
-	/** Перейменування нотатки — для подань, що вже завантажені. */
+	/** Перейменування нотатки в усіх збережених поданнях. */
 	renamePath(oldPath: string, newPath: string): void {
-		for (const [key, map] of this.cache) {
+		let changed = false;
+		for (const map of this.cache.values()) {
 			const p = map.get(oldPath);
 			if (!p) continue;
 			map.delete(oldPath);
 			map.set(newPath, p);
-			this.markDirty(key);
+			changed = true;
 		}
+		if (changed) this.markDirty();
 	}
 
-	/** Перейменування файлу бази: переносимо файли позицій усіх його подань. */
+	/** Перейменування файлу бази: переносимо ключі позицій усіх його подань. */
 	async renameBase(oldPath: string, newPath: string): Promise<void> {
-		await this.flush();
-		const posDir = normalizePath(`${this.dir}/positions`);
-		if (!(await this.adapter.exists(posDir))) return;
-		const listing = await this.adapter.list(posDir);
-		for (const f of listing.files) {
-			try {
-				const data = JSON.parse(await this.adapter.read(f)) as FileData;
-				if (!data.key?.startsWith(oldPath + "::")) continue;
-				const oldKey = data.key;
-				const key = newPath + oldKey.slice(oldPath.length);
-				data.key = key;
-				await this.adapter.write(this.file(key), JSON.stringify(data));
-				await this.adapter.remove(f);
-				const cached = this.cache.get(oldKey);
-				if (cached) {
-					this.cache.delete(oldKey);
-					this.cache.set(key, cached);
-				}
-			} catch {
-				/* пошкоджений файл позицій — пропускаємо */
-			}
+		const prefix = oldPath + "::";
+		let changed = false;
+		for (const [oldKey, map] of [...this.cache.entries()]) {
+			if (!oldKey.startsWith(prefix)) continue;
+			const newKey = newPath + oldKey.slice(oldPath.length);
+			this.cache.delete(oldKey);
+			this.cache.set(newKey, map);
+			changed = true;
 		}
+		if (changed) await this.flush(true);
 	}
 
-	private markDirty(key: string): void {
-		this.dirty.add(key);
+	private markDirty(): void {
+		this.dirty = true;
 		if (this.timer !== null) window.clearTimeout(this.timer);
 		this.timer = window.setTimeout(() => void this.flush(), SAVE_DELAY);
 	}
 
-	async flush(): Promise<void> {
+	async flush(force = false): Promise<void> {
 		if (this.timer !== null) window.clearTimeout(this.timer);
 		this.timer = null;
-		const keys = [...this.dirty];
-		this.dirty.clear();
-		if (!keys.length) return;
-		const posDir = normalizePath(`${this.dir}/positions`);
-		if (!(await this.adapter.exists(posDir))) await this.adapter.mkdir(posDir);
-		for (const key of keys) {
-			const map = this.cache.get(key);
-			if (!map) continue;
-			const data: FileData = { key, positions: Object.fromEntries(map) };
-			await this.adapter.write(this.file(key), JSON.stringify(data));
-		}
+		if (!this.dirty && !force) return;
+		this.dirty = false;
+		await this.onFlush();
 	}
-}
-
-/** FNV-1a — коротке стабільне ім'я файлу. */
-function hash(s: string): string {
-	let h = 0x811c9dc5;
-	for (let i = 0; i < s.length; i++) {
-		h ^= s.charCodeAt(i);
-		h = Math.imul(h, 0x01000193);
-	}
-	return (h >>> 0).toString(36);
 }

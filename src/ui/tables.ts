@@ -37,7 +37,7 @@ function selectCell(td: HTMLElement, opts: Opt[], value: string | null, inherit:
 }
 
 function numberCell(td: HTMLElement, value: number | null, onChange: (v: number | null) => void): void {
-	const input = td.createEl("input", { type: "number", cls: "bases-graph-num", attr: { step: "any", placeholder: "—" } });
+	const input = td.createEl("input", { type: "number", cls: "bases-relations-graph-num", attr: { step: "any", placeholder: "—" } });
 	input.value = value === null ? "" : String(value);
 	input.onchange = () => {
 		const n = parseFloat(input.value);
@@ -54,7 +54,7 @@ function colorCell(
 	td: HTMLElement, value: string | null, fallback: string, onChange: (v: string | null) => void,
 	auto = false, followValue: string | null = null,
 ): void {
-	const wrap = td.createDiv({ cls: "bases-graph-color" });
+	const wrap = td.createDiv({ cls: "bases-relations-graph-color" });
 	const clearButton = () => {
 		const clear = wrap.createEl("button", { cls: "clickable-icon", attr: { "aria-label": auto ? "Automatic" : "Inherit" } });
 		setIcon(clear, "x");
@@ -116,16 +116,16 @@ function labelCell(td: HTMLElement, ctx: TablesContext, value: LabelSpec | null,
 		text.toggle(v === "@text");
 		if (v === "@text") text.focus();
 	});
-	text = td.createEl("input", { type: "text", cls: "bases-graph-label-text", attr: { placeholder: "label text" } });
+	text = td.createEl("input", { type: "text", cls: "bases-relations-graph-label-text", attr: { placeholder: "label text" } });
 	text.value = value?.type === "text" ? value.text : "";
 	text.toggle(value?.type === "text");
 	text.oninput = () => onChange({ type: "text", text: text.value });
 }
 
 function conditionCell(td: HTMLElement, ctx: TablesContext, title: string, value: FilterTree | null, onChange: (v: FilterTree | null) => void): void {
-	const b = td.createEl("button", { cls: "bases-graph-cond-btn" });
+	const b = td.createEl("button", { cls: "bases-relations-graph-cond-btn" });
 	const text = describeCondition(value);
-	setIcon(b.createSpan({ cls: "bases-graph-picker-icon" }), "lucide-list-filter");
+	setIcon(b.createSpan({ cls: "bases-relations-graph-picker-icon" }), "lucide-list-filter");
 	b.createSpan({ text: text.length > 48 ? text.slice(0, 47) + "…" : text });
 	b.setAttr("aria-label", text);
 	b.onclick = () => new ConditionModal(ctx.app, title, value, ctx.props, ctx.ev, (v) => {
@@ -139,7 +139,7 @@ function rowControls<T extends { enabled: boolean; name: string; id: string }>(
 	tr: HTMLElement, rows: T[], i: number, ctx: TablesContext,
 ): void {
 	const r = rows[i];
-	const ord = tr.createEl("td", { cls: "bases-graph-order" });
+	const ord = tr.createEl("td", { cls: "bases-relations-graph-order" });
 	ord.createSpan({ text: String(i + 1) });
 	const up = ord.createEl("button", { cls: "clickable-icon", attr: { "aria-label": "Move up" } });
 	setIcon(up, "chevron-up");
@@ -154,7 +154,7 @@ function rowControls<T extends { enabled: boolean; name: string; id: string }>(
 	en.checked = r.enabled;
 	en.onchange = () => { r.enabled = en.checked; ctx.onChange(false); };
 
-	const name = tr.createEl("td").createEl("input", { type: "text", cls: "bases-graph-name", attr: { placeholder: "name" } });
+	const name = tr.createEl("td").createEl("input", { type: "text", cls: "bases-relations-graph-name", attr: { placeholder: "name" } });
 	name.value = r.name;
 	name.onchange = () => { r.name = name.value; ctx.onChange(false); };
 	if (ctx.errors.has(r.id)) {
@@ -203,9 +203,9 @@ function labelStyleCells(tr: HTMLElement, ctx: TablesContext, r: { labelSize?: n
 
 export function renderNodesTable(el: HTMLElement, tables: GraphTables, ctx: TablesContext): void {
 	el.empty();
-	el.createDiv({ cls: "bases-graph-hint", text: "Rows apply top to bottom: a later row overrides earlier ones in every field it sets. “—” means inherit. Each row describes one label; its index sets the place: 0 — node center, 1, 2… — above the node, −1, −2… — below it (empty = −1). Rows with the same index override each other, different indices add more labels." });
-	const scroll = el.createDiv({ cls: "bases-graph-table-scroll" });
-	const table = scroll.createEl("table", { cls: "bases-graph-table" });
+	el.createDiv({ cls: "bases-relations-graph-hint", text: "Rows apply top to bottom: a later row overrides earlier ones in every field it sets. “—” means inherit. Each row describes one label; its index sets the place: 0 — node center, 1, 2… — above the node, −1, −2… — below it (empty = −1). Rows with the same index override each other, different indices add more labels." });
+	const scroll = el.createDiv({ cls: "bases-relations-graph-table-scroll" });
+	const table = scroll.createEl("table", { cls: "bases-relations-graph-table" });
 	header(table, ["#", "", "Name", "Condition", "Shape", "Color", "Stroke", "Stroke width", "Size by", "Size value", "Label", "Label index", "Font size", "Font color", "Label background", "Visibility", ""]);
 	const body = table.createEl("tbody");
 	const rows = tables.nodes;
@@ -232,7 +232,7 @@ export function renderNodesTable(el: HTMLElement, tables: GraphTables, ctx: Tabl
 		deleteCell(tr, rows, i, ctx);
 	});
 
-	el.createEl("button", { text: "+ Add row", cls: "bases-graph-add" }).onclick = () => {
+	el.createEl("button", { text: "+ Add row", cls: "bases-relations-graph-add" }).onclick = () => {
 		rows.push(emptyNodeRule());
 		ctx.onChange(true);
 	};
@@ -242,9 +242,9 @@ export function renderNodesTable(el: HTMLElement, tables: GraphTables, ctx: Tabl
 
 export function renderEdgesTable(el: HTMLElement, tables: GraphTables, ctx: TablesContext): void {
 	el.empty();
-	el.createDiv({ cls: "bases-graph-hint", text: "Each row creates links. Source “Note” uses the note's own links; a property source turns the note into a connector that links the source value to the target values. Links not described here are not shown." });
-	const scroll = el.createDiv({ cls: "bases-graph-table-scroll" });
-	const table = scroll.createEl("table", { cls: "bases-graph-table" });
+	el.createDiv({ cls: "bases-relations-graph-hint", text: "Each row creates links. Source “Note” uses the note's own links; a property source turns the note into a connector that links the source value to the target values. Links not described here are not shown." });
+	const scroll = el.createDiv({ cls: "bases-relations-graph-table-scroll" });
+	const table = scroll.createEl("table", { cls: "bases-relations-graph-table" });
 	header(table, ["#", "", "Name", "Source", "Source value", "Target", "Target value", "Arrow to source", "Arrow to target", "Color", "Width by", "Width value", "Label", "Label mode", "Label position, %", "Font size", "Font color", "Label background", ""]);
 	const body = table.createEl("tbody");
 	const rows = tables.edges;
@@ -271,7 +271,7 @@ export function renderEdgesTable(el: HTMLElement, tables: GraphTables, ctx: Tabl
 		deleteCell(tr, rows, i, ctx);
 	});
 
-	el.createEl("button", { text: "+ Add row", cls: "bases-graph-add" }).onclick = () => {
+	el.createEl("button", { text: "+ Add row", cls: "bases-relations-graph-add" }).onclick = () => {
 		rows.push(emptyEdgeRule());
 		ctx.onChange(true);
 	};
@@ -289,12 +289,18 @@ const DIRECTIONS: PickItem[] = [
 function orderCell(td: HTMLElement, ctx: TablesContext, r: GroupRule, row: number): void {
 	const openManual = () => {
 		if (!r.groupBy) return;
-		const modal = new GroupOrderModal(ctx.app, `Group order, row ${row + 1}`, ctx.groupValues(r.groupBy), r.order ?? [], (order) => {
-			r.order = order;
-			ctx.onChange(false);
-		});
-		// Після закриття — оновити лічильник показаних значень у клітинці.
-		modal.onClose = () => ctx.onChange(true);
+		const modal = new GroupOrderModal(
+			ctx.app,
+			`Group order, row ${row + 1}`,
+			ctx.groupValues(r.groupBy),
+			r.order ?? [],
+			(order) => {
+				r.order = order;
+				ctx.onChange(false);
+			},
+			// Після закриття — оновити лічильник показаних значень у клітинці.
+			() => ctx.onChange(true),
+		);
 		modal.open();
 	};
 	createPicker(td, () => DIRECTIONS, r.direction ?? "ASC", {}, (v) => {
@@ -312,7 +318,7 @@ function orderCell(td: HTMLElement, ctx: TablesContext, r: GroupRule, row: numbe
 		const total = r.groupBy ? ctx.groupValues(r.groupBy).length : 0;
 		const present = new Set(r.groupBy ? ctx.groupValues(r.groupBy) : []);
 		const shown = (r.order ?? []).filter((v) => present.has(v)).length;
-		const b = td.createEl("button", { cls: "bases-graph-order-btn", text: `${shown}/${total}` });
+		const b = td.createEl("button", { cls: "bases-relations-graph-order-btn", text: `${shown}/${total}` });
 		setIcon(b.createSpan({ prepend: true }), "lucide-list-checks");
 		b.setAttr("aria-label", "Choose and order values");
 		b.onclick = openManual;
@@ -338,7 +344,7 @@ function groupLabelCell(td: HTMLElement, ctx: TablesContext, value: GroupLabel |
 		text.toggle(v === "@text");
 		if (v === "@text") text.focus();
 	});
-	text = td.createEl("input", { type: "text", cls: "bases-graph-label-text", attr: { placeholder: "label text" } });
+	text = td.createEl("input", { type: "text", cls: "bases-relations-graph-label-text", attr: { placeholder: "label text" } });
 	text.value = value?.type === "text" ? value.text : "";
 	text.toggle(value?.type === "text");
 	text.oninput = () => onChange({ type: "text", text: text.value });
@@ -346,12 +352,12 @@ function groupLabelCell(td: HTMLElement, ctx: TablesContext, value: GroupLabel |
 
 export function renderGroupsTable(el: HTMLElement, tables: GraphTables, ctx: TablesContext): void {
 	el.empty();
-	el.createDiv({ cls: "bases-graph-hint", text: "Each row groups nodes by a property, like Group by in Bases: every distinct value becomes its own outlined group; nodes without a value stay ungrouped. A node can belong to groups from several rows. In the force layout groups pull their members together and push other nodes out." });
+	el.createDiv({ cls: "bases-relations-graph-hint", text: "Each row groups nodes by a property, like Group by in Bases: every distinct value becomes its own outlined group; nodes without a value stay ungrouped. A node can belong to groups from several rows. In the force layout groups pull their members together and push other nodes out." });
 	if (!tables.groups) tables.groups = [];
 	const rows = tables.groups;
 	if (rows.length) {
-		const scroll = el.createDiv({ cls: "bases-graph-table-scroll" });
-		const table = scroll.createEl("table", { cls: "bases-graph-table" });
+		const scroll = el.createDiv({ cls: "bases-relations-graph-table-scroll" });
+		const table = scroll.createEl("table", { cls: "bases-relations-graph-table" });
 		header(table, ["#", "", "Name", "Group by", "Order", "Color", "Label", "Font size", "Font color", "Label background", ""]);
 		const body = table.createEl("tbody");
 		rows.forEach((r: GroupRule, i) => {
@@ -368,7 +374,7 @@ export function renderGroupsTable(el: HTMLElement, tables: GraphTables, ctx: Tab
 			deleteCell(tr, rows, i, ctx, 0);
 		});
 	}
-	el.createEl("button", { text: "+ Add group", cls: "bases-graph-add" }).onclick = () => {
+	el.createEl("button", { text: "+ Add group", cls: "bases-relations-graph-add" }).onclick = () => {
 		rows.push(emptyGroupRule());
 		ctx.onChange(true);
 	};

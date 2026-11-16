@@ -48,6 +48,7 @@ export class ConditionModal extends Modal {
 	private root: GroupNode;
 	private errorEl!: HTMLElement;
 	private values: VaultValues;
+	private suggests: ValueSuggest[] = [];
 
 	constructor(
 		app: App,
@@ -65,16 +66,24 @@ export class ConditionModal extends Modal {
 	}
 
 	onOpen(): void {
-		this.modalEl.addClass("bases-graph-condition-modal");
+		this.modalEl.addClass("bases-relations-graph-condition-modal");
 		this.render();
 	}
 
+	onClose(): void {
+		for (const s of this.suggests) s.close();
+		this.suggests = [];
+		this.contentEl.empty();
+	}
+
 	private render(): void {
+		for (const s of this.suggests) s.close();
+		this.suggests = [];
 		const { contentEl } = this;
 		const top = contentEl.scrollTop;
 		contentEl.empty();
 		this.renderGroup(contentEl, this.root, null);
-		this.errorEl = contentEl.createDiv({ cls: "bases-graph-condition-error" });
+		this.errorEl = contentEl.createDiv({ cls: "bases-relations-graph-condition-error" });
 		this.validate();
 
 		const footer = contentEl.createDiv({ cls: "modal-button-container" });
@@ -97,8 +106,8 @@ export class ConditionModal extends Modal {
 	}
 
 	private renderGroup(parent: HTMLElement, g: GroupNode, owner: GroupNode | null): void {
-		const box = parent.createDiv({ cls: "bases-graph-cond-group" });
-		const head = box.createDiv({ cls: "bases-graph-cond-head" });
+		const box = parent.createDiv({ cls: "bases-relations-graph-cond-group" });
+		const head = box.createDiv({ cls: "bases-relations-graph-cond-head" });
 		const conj = head.createEl("select", { cls: "dropdown" });
 		for (const c of ["and", "or", "not"] as Conj[]) conj.createEl("option", { value: c, text: CONJ_LABEL[c] });
 		conj.value = g.conj;
@@ -114,7 +123,7 @@ export class ConditionModal extends Modal {
 		};
 		if (owner) this.removeButton(head, owner, g);
 
-		const list = box.createDiv({ cls: "bases-graph-cond-list" });
+		const list = box.createDiv({ cls: "bases-relations-graph-cond-list" });
 		for (const child of g.children) {
 			if (child.kind === "group") this.renderGroup(list, child, g);
 			else this.renderExpr(list, child, g);
@@ -168,12 +177,12 @@ export class ConditionModal extends Modal {
 	}
 
 	private renderExpr(parent: HTMLElement, n: ExprNode, owner: GroupNode): void {
-		const row = parent.createDiv({ cls: "bases-graph-cond-row" });
+		const row = parent.createDiv({ cls: "bases-relations-graph-cond-row" });
 		const parts: ExprParts | null = n.raw ? null : parseExpr(n.text) ?? (n.text ? null : { property: "", op: "==", value: "" });
 
 		if (!parts) {
 			n.raw = true;
-			const input = row.createEl("input", { type: "text", cls: "bases-graph-cond-raw", attr: { placeholder: "Bases expression, e.g. file.links.length > 2" } });
+			const input = row.createEl("input", { type: "text", cls: "bases-relations-graph-cond-raw", attr: { placeholder: "Bases expression, e.g. file.links.length > 2" } });
 			input.value = n.text;
 			input.oninput = () => { n.text = input.value; this.validate(); };
 		} else {
@@ -188,9 +197,9 @@ export class ConditionModal extends Modal {
 			});
 
 			const opSel = row.createEl("select", { cls: "dropdown" });
-			const valInput = row.createEl("input", { type: "text", cls: "bases-graph-cond-value" });
+			const valInput = row.createEl("input", { type: "text", cls: "bases-relations-graph-cond-value" });
 			valInput.value = parts.value;
-			new ValueSuggest(this.app, valInput, () => this.valueSource(parts), () => OPS.find((o) => o.op === parts.op)?.arity === "n");
+			this.suggests.push(new ValueSuggest(this.app, valInput, () => this.valueSource(parts), () => OPS.find((o) => o.op === parts.op)?.arity === "n"));
 
 			const kind = () => (parts.property && parts.property !== "file" ? this.props.info(parts.property).kind : "text");
 			const fillOps = () => {

@@ -31,8 +31,13 @@ export class PropertyCatalog {
 		let icon = "lucide-info";
 		if (id.startsWith("note.")) {
 			const name = id.slice(5);
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			const mtm = (this.app as any).metadataTypeManager;
+			const mtm = (this.app as unknown as {
+				metadataTypeManager?: {
+					getPropertyInfo?(n: string): { widget?: string; type?: string } | undefined;
+					getTypeInfo?(n: string): { expected?: { icon?: string } } | undefined;
+					registeredTypeWidgets?: Record<string, { icon?: string } | undefined>;
+				};
+			}).metadataTypeManager;
 			const info = mtm?.getPropertyInfo?.(name);
 			const widget: string | undefined = info?.widget ?? info?.type;
 			kind = kindFromWidget(widget);
