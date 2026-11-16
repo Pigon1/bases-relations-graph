@@ -104,7 +104,7 @@ export default class BasesRelationsGraphPlugin extends Plugin {
 		for (const v of this.views) {
 			if (v.isGraphVisible() && v.hasGraphFocus()) return v;
 		}
-		const leafEl = this.app.workspace.activeLeaf?.view?.containerEl;
+		const leafEl = this.app.workspace.getMostRecentLeaf()?.view?.containerEl;
 		if (leafEl) {
 			for (const v of this.views) {
 				if (v.isGraphVisible() && v.isInContainer(leafEl)) return v;

@@ -7,8 +7,8 @@ const prod = args.has("--production");
 const watch = args.has("--watch");
 const deploy = args.has("--deploy");
 
-// Сховище, куди копіюється зібраний плагін (можна перевизначити змінною середовища).
-const VAULT = process.env.OBSIDIAN_VAULT ?? "/path/to/vault";
+// Сховище, куди --deploy копіює зібраний плагін, — лише зі змінної середовища OBSIDIAN_VAULT.
+const VAULT = process.env.OBSIDIAN_VAULT;
 const PLUGIN_ID = JSON.parse(fs.readFileSync("manifest.json", "utf8")).id;
 
 /** `import code from "./x.ts?worker"` → окремо зібраний воркер як рядок. */
@@ -39,6 +39,10 @@ const deployPlugin = {
 	setup(build) {
 		build.onEnd((result) => {
 			if (!deploy || result.errors.length) return;
+			if (!VAULT) {
+				console.warn("[deploy] skipped: set OBSIDIAN_VAULT to the vault folder to copy the plugin there");
+				return;
+			}
 			const dest = path.join(VAULT, ".obsidian", "plugins", PLUGIN_ID);
 			fs.mkdirSync(dest, { recursive: true });
 			for (const f of ["main.js", "manifest.json", "styles.css"]) fs.copyFileSync(f, path.join(dest, f));
