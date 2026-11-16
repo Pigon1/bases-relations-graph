@@ -222,6 +222,24 @@ export function defaultTables(theme: ThemeColors): GraphTables {
 				widthValue: 1,
 				label: { type: "none" },
 			},
+			// Шаблон нотатки-з'єднувача: subjects → objects, підпис — relations.
+			// Якщо таких властивостей у сховищі немає, рядок просто не дає зв'язків.
+			{
+				id: newId("e"),
+				name: "Connector notes",
+				enabled: true,
+				source: "note.subjects",
+				sourceValue: null,
+				target: "note.objects",
+				targetValue: null,
+				arrowToSource: false,
+				arrowToTarget: true,
+				color: null,
+				widthProperty: null,
+				widthValue: null,
+				label: { type: "property", property: "note.relations" },
+				labelMode: "tilted",
+			},
 		],
 		groups: [],
 	};
