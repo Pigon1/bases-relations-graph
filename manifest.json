@@ -1,9 +1,10 @@
 {
-	"id": "bases-graph",
-	"name": "Bases Graph",
+	"id": "bases-relations-graph",
+	"name": "Bases Relations Graph",
 	"version": "0.1.0",
 	"minAppVersion": "1.10.0",
-	"description": "Graph view for Bases: nodes and links styled by rule tables, links from notes or connector notes.",
-	"author": "oleksandr",
+	"description": "Visualize Bases as an interactive graph using cascading rule tables to show both direct links and relations defined through connector notes.",
+	"authorUrl": "https://github.com/Pigon1",
+	"author": "Pigon1",
 	"isDesktopOnly": false
 }
