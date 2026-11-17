@@ -117,8 +117,8 @@ export default class BasesRelationsGraphPlugin extends Plugin {
 		return null;
 	}
 
-	async onunload(): Promise<void> {
-		await this.positions.flush();
-		await this.treeStates.flush();
+	onunload(): void {
+		void this.positions.flush();
+		void this.treeStates.flush();
 	}
 }

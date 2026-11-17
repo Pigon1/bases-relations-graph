@@ -279,7 +279,7 @@ ctx.onmessage = (e) => {
 				};
 			});
 			// Нові вузли без позиції — поруч із сусідом, якщо він уже має позицію.
-			degree = new Array(nodes.length).fill(0);
+			degree = new Array<number>(nodes.length).fill(0);
 			for (const [s, t] of m.links) { degree[s]++; degree[t]++; }
 			for (const [s, t] of m.links) {
 				const a = nodes[s], b = nodes[t];

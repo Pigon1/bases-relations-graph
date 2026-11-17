@@ -58,7 +58,7 @@ export class TreeController {
 		const prev = this.undoStack.pop();
 		if (!prev) return false;
 		this.redoStack.push(JSON.stringify(this.state));
-		this.state = JSON.parse(prev);
+		this.state = JSON.parse(prev) as TreeState;
 		this.store.save(this.key, this.state);
 		return true;
 	}
@@ -67,7 +67,7 @@ export class TreeController {
 		const next = this.redoStack.pop();
 		if (!next) return false;
 		this.undoStack.push(JSON.stringify(this.state));
-		this.state = JSON.parse(next);
+		this.state = JSON.parse(next) as TreeState;
 		this.store.save(this.key, this.state);
 		return true;
 	}

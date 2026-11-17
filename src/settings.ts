@@ -418,7 +418,7 @@ export class BasesRelationsGraphSettingTab extends PluginSettingTab {
 			if (this.stopRecording === cleanup) this.stopRecording = null;
 		};
 
-		const onKeyDown = async (e: KeyboardEvent) => {
+		const onKeyDown = (e: KeyboardEvent) => {
 			e.preventDefault();
 			e.stopPropagation();
 			const list = this.plugin.settings.hotkeys[actionId];
@@ -432,7 +432,7 @@ export class BasesRelationsGraphSettingTab extends PluginSettingTab {
 			cleanup();
 			if (!list.some((b) => sameHotkey(b, binding))) {
 				list.push(binding);
-				await this.plugin.saveSettings();
+				void this.plugin.saveSettings();
 			}
 			this.display();
 		};

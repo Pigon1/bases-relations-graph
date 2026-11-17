@@ -85,7 +85,7 @@ export class VaultValues {
 				// Ключі властивостей у Obsidian нечутливі до регістру.
 				const key = Object.keys(fm).find((k) => k.toLowerCase() === lower);
 				if (key === undefined) continue;
-				const v = fm[key];
+				const v: unknown = fm[key];
 				if (Array.isArray(v)) v.forEach(add);
 				else add(v);
 			}

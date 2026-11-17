@@ -423,7 +423,7 @@ function memoTest(byPath: Map<string, BasesEntry>) {
 		const entry = byPath.get(path);
 		if (!entry) return false;
 		let m = cache.get(f);
-		if (!m) cache.set(f, (m = new Map()));
+		if (!m) cache.set(f, (m = new Map<string, boolean>()));
 		let r = m.get(path);
 		if (r === undefined) m.set(path, (r = f.test(entry)));
 		return r;

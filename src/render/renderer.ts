@@ -296,7 +296,7 @@ export class GraphRenderer {
 	requestRender(): void {
 		if (this.dirty) return;
 		this.dirty = true;
-		this.frame = requestAnimationFrame(() => {
+		this.frame = window.requestAnimationFrame(() => {
 			this.dirty = false;
 			this.draw();
 		});
@@ -849,7 +849,7 @@ export class GraphRenderer {
 			this.pointers.set(e.pointerId, { x, y });
 			if (this.pointers.size === 2) {
 				// Другий палець — щипок, скасовує натискання.
-				if (this.press) { clearTimeout(this.press.timer); this.finishPress(null); this.press = null; }
+				if (this.press) { window.clearTimeout(this.press.timer); this.finishPress(null); this.press = null; }
 				this.startPinch();
 				return;
 			}
@@ -887,7 +887,7 @@ export class GraphRenderer {
 			if (press && press.id === e.pointerId) {
 				if (!press.moved && Math.hypot(x - press.x, y - press.y) > CLICK_SLOP) {
 					press.moved = true;
-					clearTimeout(press.timer);
+					window.clearTimeout(press.timer);
 					if (press.action === "drag" && !press.menu) this.beginDrag(press);
 					if (press.action === "peek") this.beginPeekDrag(press);
 					if (press.action === "band") this.band = { x0: press.x, y0: press.y, x1: x, y1: y };
@@ -916,7 +916,7 @@ export class GraphRenderer {
 			if (this.pinch && this.pointers.size < 2) this.pinch = null;
 			const press = this.press;
 			if (!press || press.id !== e.pointerId) return;
-			clearTimeout(press.timer);
+			window.clearTimeout(press.timer);
 			this.press = null;
 			if (press.menu) return;
 			this.finishPress(e.type === "pointerup" ? e : null, press);
@@ -930,7 +930,7 @@ export class GraphRenderer {
 			e.preventDefault();
 			const [x, y] = this.local(e);
 			const node = this.pick(x, y);
-			if ((e as PointerEvent).pointerType?.startsWith("touch")) return;
+			if (e.pointerType?.startsWith("touch")) return;
 			if (node >= 0) this.cb.onNodeMenu(node, e);
 			else if (!this.peek || this.pickPeek(x, y) < 0) {
 				const [wx, wy] = this.toWorld(x, y);
@@ -1112,9 +1112,9 @@ export class GraphRenderer {
 	}
 
 	destroy(): void {
-		cancelAnimationFrame(this.frame);
+		window.cancelAnimationFrame(this.frame);
 		this.resizeObserver?.disconnect();
-		if (this.press) clearTimeout(this.press.timer);
+		if (this.press) window.clearTimeout(this.press.timer);
 		window.clearTimeout(this.clickTimer);
 		this.hidePeek();
 		if (this.ready) this.app.destroy(true, { children: true });

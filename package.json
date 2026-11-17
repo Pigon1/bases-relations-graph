@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-bases-relations-graph",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "Visualize Bases as an interactive graph using cascading rule tables to show both direct links and relations defined through connector notes.",
 	"main": "main.js",
 	"private": true,

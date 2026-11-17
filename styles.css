@@ -256,7 +256,7 @@
 	margin: var(--size-4-2) 0;
 }
 
-.is-mobile .bases-relations-graph-seg span:not(.svg-icon):not(:has(svg)) {
+.is-mobile .bases-relations-graph-seg-label {
 	display: none;
 }
 
@@ -420,7 +420,7 @@
 }
 
 .bases-relations-graph-canvas-host.is-picking-root canvas {
-	cursor: crosshair !important;
+	cursor: crosshair;
 }
 
 /* Згортання груп */
@@ -438,7 +438,7 @@
 }
 
 .bases-relations-graph-legend-item.is-collapsed .bases-relations-graph-legend-dot {
-	background: transparent !important;
+	background: transparent;
 	box-shadow: inset 0 0 0 2px currentColor;
 }
 

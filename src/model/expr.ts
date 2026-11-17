@@ -110,10 +110,10 @@ export function buildExpr(p: ExprParts, kind: ValueKind): string {
 function unliteral(a: string): string {
 	const s = a.trim();
 	let m = /^link\(("(?:[^"\\]|\\.)*")\)$/.exec(s);
-	if (m) return `[[${JSON.parse(m[1])}]]`;
+	if (m) return `[[${JSON.parse(m[1]) as string}]]`;
 	m = /^date\(("(?:[^"\\]|\\.)*")\)$/.exec(s);
-	if (m) return JSON.parse(m[1]);
-	if (/^"(?:[^"\\]|\\.)*"$/.test(s)) return JSON.parse(s);
+	if (m) return JSON.parse(m[1]) as string;
+	if (/^"(?:[^"\\]|\\.)*"$/.test(s)) return JSON.parse(s) as string;
 	return s;
 }
 

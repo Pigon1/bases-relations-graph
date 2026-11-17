@@ -116,7 +116,7 @@ export class GraphView extends BasesView {
 		for (const [m, label, icon] of [["graph", "Graph", "git-fork"], ["nodes", "Nodes", "circle-dot"], ["edges", "Links", "spline"], ["groups", "Groups", "boxes"]] as [Mode, string, string][]) {
 			const b = seg.createEl("button", { cls: "bases-relations-graph-seg" });
 			setIcon(b.createSpan(), icon);
-			b.createSpan({ text: label });
+			b.createSpan({ cls: "bases-relations-graph-seg-label", text: label });
 			b.onclick = () => this.setMode(m);
 			this.modeButtons.set(m, b);
 		}
@@ -450,7 +450,7 @@ export class GraphView extends BasesView {
 				window.setTimeout(() => this.renderer.fit(), TWEEN_MS + 20);
 			}
 		} else {
-			cancelAnimationFrame(this.tweenFrame);
+			window.cancelAnimationFrame(this.tweenFrame);
 			this.renderer.dragExpand = null;
 			this.renderer.groupSplit = 0;
 			this.renderer.setTreeEdges(null, null, "straight");
@@ -542,7 +542,7 @@ export class GraphView extends BasesView {
 
 	/** Плавний перехід вузлів до нових позицій. */
 	private animateTo(target: Float32Array): void {
-		cancelAnimationFrame(this.tweenFrame);
+		window.cancelAnimationFrame(this.tweenFrame);
 		const from = this.renderer.getPositions().slice();
 		if (from.length !== target.length) {
 			this.renderer.setPositions(target);
@@ -555,7 +555,7 @@ export class GraphView extends BasesView {
 			const cur = new Float32Array(target.length);
 			for (let i = 0; i < cur.length; i++) cur[i] = from[i] + (target[i] - from[i]) * k;
 			this.renderer.setPositions(t < 1 ? cur : target);
-			if (t < 1) this.tweenFrame = requestAnimationFrame(step);
+			if (t < 1) this.tweenFrame = window.requestAnimationFrame(step);
 		};
 		step();
 	}
@@ -977,7 +977,7 @@ export class GraphView extends BasesView {
 			props: this.props,
 			ev: this.ev,
 			theme: this.theme,
-			errors: this.model?.errors ?? new Map(),
+			errors: this.model?.errors ?? new Map<string, string>(),
 			groupValues: (property) => groupValues(this.data?.data ?? [], property),
 			onChange: (structural) => {
 				this.saveTables();
@@ -1018,7 +1018,7 @@ export class GraphView extends BasesView {
 				menu.addItem((it) => it.setTitle("Set as root").setIcon("crown").onClick(() => { this.tree.setRoot(i); this.rebuild(); }));
 				menu.addItem((it) => it.setTitle("Reset position").setIcon("rotate-ccw").onClick(() => { this.tree.resetNodes([i]); this.rebuild(); }));
 			}
-			menu.showAtMouseEvent(e as MouseEvent);
+			menu.showAtMouseEvent(e);
 			return;
 		}
 		const isPinned = this.pinned.has(id);
@@ -1027,7 +1027,7 @@ export class GraphView extends BasesView {
 		menu.addItem((it) => it.setTitle("Open in new tab").setIcon("file-plus").onClick(() => this.openNode(i, "tab")));
 		menu.addSeparator();
 		// Згортання з меню — у точку, де був клік.
-		const at = this.renderer.eventToWorld(e as MouseEvent);
+		const at = this.renderer.eventToWorld(e);
 		for (const g of this.model?.groups ?? []) {
 			if (!g.members.includes(i)) continue;
 			menu.addItem((it) => it.setTitle(`Collapse group “${g.name}”`).setIcon("minimize-2").onClick(() => this.toggleCollapse(g.id, at)));
@@ -1038,7 +1038,7 @@ export class GraphView extends BasesView {
 		if (this.layoutKind === "tree") {
 			menu.addItem((it) => it.setTitle("Set as root").setIcon("crown").onClick(() => { this.tree.setRoot(i); this.rebuild(); }));
 			menu.addItem((it) => it.setTitle("Reset position" + suffix).setIcon("rotate-ccw").onClick(() => { this.tree.resetNodes(targets); this.rebuild(); }));
-			menu.showAtMouseEvent(e as MouseEvent);
+			menu.showAtMouseEvent(e);
 			return;
 		}
 		menu.addItem((it) => it.setTitle((isPinned ? "Unpin" : "Pin") + suffix).setIcon(isPinned ? "pin-off" : "pin").onClick(() => {
@@ -1051,7 +1051,7 @@ export class GraphView extends BasesView {
 			}
 			this.sim.send({ type: "pin", indices: targets, pinned: !isPinned });
 		}));
-		menu.showAtMouseEvent(e as MouseEvent);
+		menu.showAtMouseEvent(e);
 	}
 
 	onResize(): void {
@@ -1065,7 +1065,7 @@ export class GraphView extends BasesView {
 			window.clearTimeout(this.tablesTimer);
 			this.saveTables(true);
 		}
-		cancelAnimationFrame(this.tweenFrame);
+		window.cancelAnimationFrame(this.tweenFrame);
 		this.closePeek();
 		this.sim.send({ type: "stop" });
 		this.sim.destroy();
