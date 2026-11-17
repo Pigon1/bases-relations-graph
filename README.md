@@ -44,6 +44,17 @@ What makes it different from the core graph:
 
 The toolbar above the graph switches between the **Graph** and its **Nodes**, **Links** and **Groups** tables, and has buttons to fit the graph, freeze the layout and restart the simulation. In the tree layout it also shows orientation, root, undo/redo and reset buttons.
 
+## Try the demo vault
+
+The [`demo-vault`](demo-vault) folder is a small, fictional OSINT investigation set up to show what the plugin can do: people and companies in `Info/Entities`, connector notes in `Info/Facts`, and a ready-made base in `Reports/Graph.base` with two views — **Relations** (force layout) and **Tree**.
+
+1. Download this repository (*Code → Download ZIP*) and unpack it, or clone it.
+2. In Obsidian choose *Open another vault → Open folder as vault* and select `demo-vault`.
+3. Turn on community plugins and install **Bases Relations Graph** (see [Installation](#installation)).
+4. Open `Reports/Graph.base`.
+
+All people, companies, places and links in the demo vault are made up.
+
 ## Connector notes
 
 A connector note links other notes through its properties:
