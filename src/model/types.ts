@@ -245,6 +245,30 @@ export function defaultTables(theme: ThemeColors): GraphTables {
 	};
 }
 
+/**
+ * Доповнює рядки таблиць усіма полями. Відсутнє поле (рядок, записаний вручну або
+ * старою версією) має означати «—» (успадкувати), а не перекривати попередні рядки.
+ */
+export function normalizeTables(raw: Partial<GraphTables>): GraphTables {
+	const fill = <T extends { id: string }>(rows: unknown, empty: () => T): T[] =>
+		(Array.isArray(rows) ? rows : [])
+			.filter((r): r is Record<string, unknown> => !!r && typeof r === "object")
+			.map((r) => {
+				const base = empty();
+				const out = { ...base } as Record<string, unknown>;
+				for (const [k, v] of Object.entries(r)) if (v !== undefined) out[k] = v;
+				if (typeof out.id !== "string" || !out.id) out.id = base.id;
+				if (typeof out.enabled !== "boolean") out.enabled = true;
+				if (typeof out.name !== "string") out.name = "";
+				return out as unknown as T;
+			});
+	return {
+		nodes: fill(raw.nodes, emptyNodeRule),
+		edges: fill(raw.edges, emptyEdgeRule),
+		groups: fill(raw.groups, emptyGroupRule),
+	};
+}
+
 export function emptyGroupRule(): GroupRule {
 	return {
 		id: newId("g"), name: "", enabled: true, groupBy: null, direction: null, color: null,

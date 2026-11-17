@@ -4,7 +4,7 @@ import { toCss } from "../model/color";
 import { buildGraph, groupValues, type GGroup, type GraphModel } from "../model/build";
 import { collapseGroups, GROUP_NODE_PREFIX, isGroupNode, type ViewModel } from "../model/collapse";
 import { readThemeColors } from "../model/theme";
-import { DEFAULT_SETTINGS, defaultTables, type GraphSettings, type GraphTables, type LayoutKind, type ThemeColors } from "../model/types";
+import { DEFAULT_SETTINGS, defaultTables, normalizeTables, type GraphSettings, type GraphTables, type LayoutKind, type ThemeColors } from "../model/types";
 import { GraphRenderer } from "../render/renderer";
 import { formatActionHotkeys, formatModifier, GRAPH_ACTIONS, matchHotkey, type GraphActionId } from "../settings";
 import { SimClient } from "../sim/client";
@@ -357,7 +357,7 @@ export class GraphView extends BasesView {
 		const json = JSON.stringify({ nodes, edges, groups: Array.isArray(groups) ? groups : [] });
 		if (this.tables && (json === this.tablesJson || json === this.writtenJson)) return;
 		// Зміна ззовні (інше вікно, синхронізація, ручне редагування .base).
-		this.tables = JSON.parse(json) as GraphTables;
+		this.tables = normalizeTables(JSON.parse(json) as Partial<GraphTables>);
 		this.tablesJson = json;
 		this.renderTables();
 	}
