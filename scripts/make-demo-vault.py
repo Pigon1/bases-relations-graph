@@ -122,7 +122,7 @@ for title, cases, subj, rel, obj, source, confirmed in facts:
         "confirmed": confirmed,
     })
 
-# ---------- Звіт, ресурси, шпаргалки ----------
+# ---------- Звіт ----------
 write("Reports/Case 101 - Northwind summary.md", {"cases": [q(C1)], "status": q("in progress")}, """
 # Northwind ownership
 
@@ -132,37 +132,9 @@ write("Reports/Case 101 - Northwind summary.md", {"cases": [q(C1)], "status": q(
 
 Open question: what connects Hartley and Hale besides the investment committee?
 See the graph in [[Graph.base]].
+
+*All people, companies, places and links in this vault are fictional.*
 """)
-write("Resources.md", {}, """
-# Resources
-
-All people, companies, places and links in this vault are fictional. Typical sources for this kind of research:
-
-- Company registries and aggregators (ownership, directors, registered addresses)
-- Court and procurement databases
-- Social networks (followers, followings, profile history)
-- News archives and web archives
-- Maps and satellite imagery for addresses
-""")
-write("Cheatsheets/Search operators.md", {}, """
-# Search operators
-
-- `"exact phrase"` — exact match
-- `site:example.org` — results from one site
-- `filetype:pdf` — documents of one type
-- `-word` — exclude a word
-- `intitle:word` — word in the page title
-""")
-write("Cheatsheets/Company check.md", {}, """
-# Company check
-
-1. Registry record: number, registration date, registered address
-2. Directors and shareholders, including former ones
-3. Beneficial owners and nominee services
-4. Shared addresses, phones and agents with other companies
-5. Mentions in news, courts and procurement
-""")
-
 # ---------- Graph.base: таблиці в повному форматі рядків, як їх зберігає плагін ----------
 NODE = ["id", "name", "enabled", "condition", "shape", "color", "strokeColor", "strokeWidth", "sizeProperty", "sizeValue",
         "label", "labelIndex", "labelSize", "labelColor", "labelBackground", "show"]

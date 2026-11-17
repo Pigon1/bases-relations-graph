@@ -11,3 +11,5 @@ status: "in progress"
 
 Open question: what connects Hartley and Hale besides the investment committee?
 See the graph in [[Graph.base]].
+
+*All people, companies, places and links in this vault are fictional.*
