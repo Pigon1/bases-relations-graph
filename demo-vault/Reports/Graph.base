@@ -1,0 +1,434 @@
+filters:
+  and:
+  - file.inFolder("Info")
+views:
+- type: bases-relations-graph
+  name: Relations
+  order:
+  - file.name
+  layout: force
+  linkDistance: 160
+  showLegend: true
+  nodes:
+  - id: ndefault
+    name: Default
+    enabled: true
+    condition:
+    shape: circle
+    color: rgba(140, 140, 140, 1)
+    strokeColor:
+    strokeWidth:
+    sizeProperty: '@links'
+    sizeValue: 1
+    label:
+      type: property
+      property: file.basename
+    labelIndex:
+    labelSize: 13
+    labelColor:
+    labelBackground:
+    show: show
+  - id: nfacts
+    name: Facts are links
+    enabled: true
+    condition:
+      and:
+      - file.inFolder("Info/Facts")
+    shape:
+    color:
+    strokeColor:
+    strokeWidth:
+    sizeProperty:
+    sizeValue:
+    label:
+    labelIndex:
+    labelSize:
+    labelColor:
+    labelBackground:
+    show: hide
+  - id: nlists
+    name: Lists
+    enabled: true
+    condition:
+      and:
+      - file.inFolder("Info/Entities/Lists")
+    shape:
+    color:
+    strokeColor:
+    strokeWidth:
+    sizeProperty:
+    sizeValue:
+    label:
+    labelIndex:
+    labelSize:
+    labelColor:
+    labelBackground:
+    show: hide
+  - id: npeople
+    name: People
+    enabled: true
+    condition:
+      and:
+      - file.inFolder("Info/Entities/People")
+    shape: circle
+    color: rgba(82, 172, 57, 1)
+    strokeColor:
+    strokeWidth:
+    sizeProperty:
+    sizeValue:
+    label:
+    labelIndex:
+    labelSize:
+    labelColor:
+    labelBackground:
+    show:
+  - id: norgs
+    name: Organizations
+    enabled: true
+    condition:
+      and:
+      - file.inFolder("Info/Entities/Organizations")
+    shape: square
+    color: rgba(74, 144, 226, 1)
+    strokeColor:
+    strokeWidth:
+    sizeProperty:
+    sizeValue:
+    label:
+    labelIndex:
+    labelSize:
+    labelColor:
+    labelBackground:
+    show:
+  - id: nshells
+    name: Shell candidates
+    enabled: true
+    condition:
+      and:
+      - note.tags.contains("shell-candidate")
+    shape:
+    color:
+    strokeColor: rgba(229, 72, 77, 1)
+    strokeWidth: 3
+    sizeProperty:
+    sizeValue:
+    label:
+      type: text
+      text: shell?
+    labelIndex: 1
+    labelSize: 10
+    labelColor: rgba(255, 255, 255, 1)
+    labelBackground: rgba(229, 72, 77, 0.9)
+    show:
+  - id: nplaces
+    name: Places
+    enabled: true
+    condition:
+      and:
+      - file.inFolder("Info/Entities/Places")
+    shape: triangle
+    color: rgba(240, 145, 81, 1)
+    strokeColor:
+    strokeWidth:
+    sizeProperty:
+    sizeValue:
+    label:
+    labelIndex:
+    labelSize:
+    labelColor:
+    labelBackground:
+    show:
+  - id: ngroups
+    name: Groups
+    enabled: true
+    condition:
+      and:
+      - file.inFolder("Info/Entities/Groups")
+    shape: diamond
+    color: rgba(167, 139, 250, 1)
+    strokeColor:
+    strokeWidth:
+    sizeProperty:
+    sizeValue:
+    label:
+    labelIndex:
+    labelSize:
+    labelColor:
+    labelBackground:
+    show:
+  edges:
+  - id: elinks
+    name: Links
+    enabled: true
+    source: '@note'
+    sourceValue:
+    target: '@links'
+    targetValue:
+    arrowToSource: false
+    arrowToTarget: true
+    color: rgba(160, 160, 160, 0.8)
+    widthProperty: '@fixed'
+    widthValue: 1
+    label:
+      type: none
+    labelMode:
+    labelPosition:
+    labelSize:
+    labelColor:
+    labelBackground:
+  - id: erelations
+    name: Connector notes
+    enabled: true
+    source: note.subjects
+    sourceValue:
+    target: note.objects
+    targetValue:
+    arrowToSource: false
+    arrowToTarget: true
+    color: rgba(240, 145, 81, 0.9)
+    widthProperty: '@fixed'
+    widthValue: 1.5
+    label:
+      type: property
+      property: note.relations
+    labelMode: tilted
+    labelPosition: 50
+    labelSize: 11
+    labelColor: rgba(200, 110, 50, 1)
+    labelBackground:
+  groups:
+  - id: gcases
+    name: Cases
+    enabled: true
+    groupBy: note.cases
+    direction: ASC
+    color:
+    label:
+    labelSize: 14
+    labelColor: '@group'
+    labelBackground:
+  - id: gtypes
+    name: Entity types
+    enabled: false
+    groupBy: file.folder
+    direction: ASC
+    color:
+    label:
+    labelSize:
+    labelColor: '@group'
+    labelBackground:
+- type: bases-relations-graph
+  name: Tree
+  order:
+  - file.name
+  layout: tree
+  treeLinkStyle: curved
+  showLegend: true
+  nodes:
+  - id: ndefault
+    name: Default
+    enabled: true
+    condition:
+    shape: circle
+    color: rgba(140, 140, 140, 1)
+    strokeColor:
+    strokeWidth:
+    sizeProperty: '@links'
+    sizeValue: 1
+    label:
+      type: property
+      property: file.basename
+    labelIndex:
+    labelSize: 13
+    labelColor:
+    labelBackground:
+    show: show
+  - id: nfacts
+    name: Facts are links
+    enabled: true
+    condition:
+      and:
+      - file.inFolder("Info/Facts")
+    shape:
+    color:
+    strokeColor:
+    strokeWidth:
+    sizeProperty:
+    sizeValue:
+    label:
+    labelIndex:
+    labelSize:
+    labelColor:
+    labelBackground:
+    show: hide
+  - id: nlists
+    name: Lists
+    enabled: true
+    condition:
+      and:
+      - file.inFolder("Info/Entities/Lists")
+    shape:
+    color:
+    strokeColor:
+    strokeWidth:
+    sizeProperty:
+    sizeValue:
+    label:
+    labelIndex:
+    labelSize:
+    labelColor:
+    labelBackground:
+    show: hide
+  - id: npeople
+    name: People
+    enabled: true
+    condition:
+      and:
+      - file.inFolder("Info/Entities/People")
+    shape: circle
+    color: rgba(82, 172, 57, 1)
+    strokeColor:
+    strokeWidth:
+    sizeProperty:
+    sizeValue:
+    label:
+    labelIndex:
+    labelSize:
+    labelColor:
+    labelBackground:
+    show:
+  - id: norgs
+    name: Organizations
+    enabled: true
+    condition:
+      and:
+      - file.inFolder("Info/Entities/Organizations")
+    shape: square
+    color: rgba(74, 144, 226, 1)
+    strokeColor:
+    strokeWidth:
+    sizeProperty:
+    sizeValue:
+    label:
+    labelIndex:
+    labelSize:
+    labelColor:
+    labelBackground:
+    show:
+  - id: nshells
+    name: Shell candidates
+    enabled: true
+    condition:
+      and:
+      - note.tags.contains("shell-candidate")
+    shape:
+    color:
+    strokeColor: rgba(229, 72, 77, 1)
+    strokeWidth: 3
+    sizeProperty:
+    sizeValue:
+    label:
+      type: text
+      text: shell?
+    labelIndex: 1
+    labelSize: 10
+    labelColor: rgba(255, 255, 255, 1)
+    labelBackground: rgba(229, 72, 77, 0.9)
+    show:
+  - id: nplaces
+    name: Places
+    enabled: true
+    condition:
+      and:
+      - file.inFolder("Info/Entities/Places")
+    shape: triangle
+    color: rgba(240, 145, 81, 1)
+    strokeColor:
+    strokeWidth:
+    sizeProperty:
+    sizeValue:
+    label:
+    labelIndex:
+    labelSize:
+    labelColor:
+    labelBackground:
+    show:
+  - id: ngroups
+    name: Groups
+    enabled: true
+    condition:
+      and:
+      - file.inFolder("Info/Entities/Groups")
+    shape: diamond
+    color: rgba(167, 139, 250, 1)
+    strokeColor:
+    strokeWidth:
+    sizeProperty:
+    sizeValue:
+    label:
+    labelIndex:
+    labelSize:
+    labelColor:
+    labelBackground:
+    show:
+  edges:
+  - id: elinks
+    name: Links
+    enabled: true
+    source: '@note'
+    sourceValue:
+    target: '@links'
+    targetValue:
+    arrowToSource: false
+    arrowToTarget: true
+    color: rgba(160, 160, 160, 0.8)
+    widthProperty: '@fixed'
+    widthValue: 1
+    label:
+      type: none
+    labelMode:
+    labelPosition:
+    labelSize:
+    labelColor:
+    labelBackground:
+  - id: erelations
+    name: Connector notes
+    enabled: true
+    source: note.subjects
+    sourceValue:
+    target: note.objects
+    targetValue:
+    arrowToSource: false
+    arrowToTarget: true
+    color: rgba(240, 145, 81, 0.9)
+    widthProperty: '@fixed'
+    widthValue: 1.5
+    label:
+      type: property
+      property: note.relations
+    labelMode: tilted
+    labelPosition: 50
+    labelSize: 11
+    labelColor: rgba(200, 110, 50, 1)
+    labelBackground:
+  groups:
+  - id: gcases
+    name: Cases
+    enabled: true
+    groupBy: note.cases
+    direction: ASC
+    color:
+    label:
+    labelSize: 14
+    labelColor: '@group'
+    labelBackground:
+  - id: gtypes
+    name: Entity types
+    enabled: false
+    groupBy: file.folder
+    direction: ASC
+    color:
+    label:
+    labelSize:
+    labelColor: '@group'
+    labelBackground:
