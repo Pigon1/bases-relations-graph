@@ -4,7 +4,7 @@ A graph view for [Obsidian Bases](https://help.obsidian.md/bases). Every note in
 
 What makes it different from the core graph:
 
-- **Relations through connector notes.** A note can describe a relationship instead of being a node: `subjects: [[Alice]]`, `objects: [[Acme Corp]]`, `relations: founder` becomes a labeled arrow *Alice → Acme Corp*. Ordinary links between notes work too.
+- **Relations through connector notes.** A note can describe a relationship instead of being a node: `subjects: [[Anna Miller]]`, `objects: [[Mark Lee]]`, `relations: married` becomes a labeled arrow *Anna Miller → Mark Lee*. Ordinary links between notes work too.
 - **Full customization of the graph.** Shapes, colors, outlines, sizes, several labels per node, link colors, widths, arrows and label placement — all driven by your note properties through cascading rules, with conditions written exactly like Bases filters.
 - **Groups and layouts.** Outline and collapse groups of notes, and switch between a live force layout, a frozen layout you arrange by hand, and a tree.
 
@@ -46,14 +46,12 @@ The toolbar above the graph switches between the **Graph** and its **Nodes**, **
 
 ## Try the demo vault
 
-The [`demo-vault`](demo-vault) folder is a small, fictional OSINT investigation set up to show what the plugin can do: people and companies in `Info/Entities`, connector notes in `Info/Facts`, and a ready-made base in `Reports/Graph.base` with two views — **Relations** (force layout) and **Tree**.
+The [`demo-vault`](demo-vault) folder is a small, made-up network of family and friends: people in `People`, places and events in `Places` and `Events`, and relation notes in `Relations` (*married*, *parent of*, *best friend*, *colleague*…). `Family graph.base` has two ready-made views — **Relations** (force layout) and **Tree** (a family tree).
 
 1. Download this repository (*Code → Download ZIP*) and unpack it, or clone it.
 2. In Obsidian choose *Open another vault → Open folder as vault* and select `demo-vault`.
 3. Turn on community plugins and install **Bases Relations Graph** (see [Installation](#installation)).
-4. Open `Reports/Graph.base`.
-
-All people, companies, places and links in the demo vault are made up.
+4. Open `Family graph.base`.
 
 ## Connector notes
 
@@ -61,17 +59,19 @@ A connector note links other notes through its properties:
 
 ```yaml
 ---
-subjects: "[[Alice]]"
+subjects:
+  - "[[Robert Miller]]"
+  - "[[Helen Miller]]"
+relations: parent of
 objects:
-  - "[[Acme Corp]]"
-  - "[[Acme Labs]]"
-relations: founder
+  - "[[Anna Miller]]"
+  - "[[Tom Miller]]"
 ---
 ```
 
-The default **Links** table already contains a *Connector notes* row: `subjects` → `objects`, labeled with `relations`. The note above produces two arrows, *Alice → Acme Corp* and *Alice → Acme Labs*, both labeled *founder*. Use any other property names by editing the row or adding new ones.
+The default **Links** table already contains a *Connector notes* row: `subjects` → `objects`, labeled with `relations`. The note above (from the [demo vault](#try-the-demo-vault)) produces four arrows — from each parent to each child — all labeled *parent of*. Use any other property names by editing the row or adding new ones.
 
-To keep connector notes themselves off the graph, add a row to the **Nodes** table with a condition that matches them (for example, a folder or a `type` property) and set *Visibility* to *Hide*.
+To keep connector notes themselves off the graph, add a row to the **Nodes** table with a condition that matches them (for example, `file.inFolder("Relations")` in the demo vault) and set *Visibility* to *Hide*.
 
 ![A connector note and the labeled relation it creates on the graph](docs/images/connector-notes.png)
 
