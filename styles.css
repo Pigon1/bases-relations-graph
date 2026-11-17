@@ -82,47 +82,108 @@
 	margin-bottom: var(--size-4-2);
 }
 
-.bases-relations-graph-table-scroll {
-	overflow-x: auto;
+/* Правила — картки замість широкої таблиці: поля переносяться під ширину панелі */
+
+.bases-relations-graph-rules {
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-4-3);
+	max-width: 1100px;
 }
 
-.bases-relations-graph-table {
-	border-collapse: collapse;
-	font-size: var(--font-ui-small);
-	width: max-content;
+.bases-relations-graph-rule {
+	border: var(--border-width) solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	background: var(--background-primary);
+	overflow: hidden;
 }
 
-.bases-relations-graph-table th {
-	text-align: left;
-	font-weight: var(--font-semibold);
-	color: var(--text-muted);
-	padding: var(--size-4-1) var(--size-4-2);
-	border-bottom: var(--border-width) solid var(--background-modifier-border);
-	white-space: nowrap;
-}
-
-.bases-relations-graph-table td {
-	padding: var(--size-4-1) var(--size-4-2);
-	border-bottom: var(--border-width) solid var(--background-modifier-border);
-	vertical-align: middle;
-}
-
-.bases-relations-graph-table tr.has-error .bases-relations-graph-name {
+.bases-relations-graph-rule.has-error {
 	border-color: var(--text-error);
 }
 
-.bases-relations-graph-order {
+.bases-relations-graph-rule.is-disabled .bases-relations-graph-rule-body,
+.bases-relations-graph-rule.is-disabled .bases-relations-graph-rule-name {
+	opacity: 0.5;
+}
+
+.bases-relations-graph-rule-head {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-1);
+	padding: var(--size-4-1) var(--size-4-2);
+	background: var(--background-secondary);
+	border-bottom: var(--border-width) solid var(--background-modifier-border);
+}
+
+.bases-relations-graph-rule-num {
+	min-width: 1.6em;
+	text-align: center;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	font-variant-numeric: tabular-nums;
+}
+
+.bases-relations-graph-rule-name {
+	flex: 1;
+	min-width: 6em;
+	font-weight: var(--font-semibold);
+}
+
+.bases-relations-graph-rule-error {
+	padding: var(--size-4-1) var(--size-4-3);
+	color: var(--text-error);
+	font-size: var(--font-ui-smaller);
+}
+
+/* Групи полів стоять поруч, доки вистачає місця, і переносяться на вузькій панелі. */
+.bases-relations-graph-rule-body {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+	gap: var(--size-4-3) var(--size-4-4);
+	padding: var(--size-4-2) var(--size-4-3) var(--size-4-3);
+}
+
+.bases-relations-graph-section {
+	min-width: 0;
+}
+
+.bases-relations-graph-section-title {
+	font-size: var(--font-ui-smaller);
+	font-weight: var(--font-semibold);
+	color: var(--text-faint);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	margin-bottom: var(--size-4-1);
+}
+
+.bases-relations-graph-fields {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	gap: var(--size-4-2) var(--size-4-3);
+}
+
+.bases-relations-graph-field {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+	max-width: 100%;
+}
+
+.bases-relations-graph-field-label {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
 	white-space: nowrap;
 }
 
-.bases-relations-graph-order span {
-	display: inline-block;
-	min-width: 1.5em;
-	color: var(--text-muted);
-}
-
-.bases-relations-graph-name {
-	width: 9em;
+.bases-relations-graph-field-control {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: var(--size-4-1);
+	min-width: 0;
 }
 
 .bases-relations-graph-num {
@@ -131,7 +192,6 @@
 
 .bases-relations-graph-label-text {
 	width: 8em;
-	margin-left: var(--size-4-1);
 }
 
 .bases-relations-graph-color {
@@ -145,7 +205,7 @@
 }
 
 .bases-relations-graph-cond-btn {
-	max-width: 18em;
+	max-width: 100%;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;

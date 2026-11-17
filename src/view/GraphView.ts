@@ -991,13 +991,10 @@ export class GraphView extends BasesView {
 		for (let el: HTMLElement | null = this.tablesEl; el && el !== document.body; el = el.parentElement) {
 			if (el.scrollTop) scrolled.push([el, el.scrollTop]);
 		}
-		const left = this.tablesEl.querySelector(".bases-relations-graph-table-scroll")?.scrollLeft ?? 0;
 		if (this.mode === "nodes") renderNodesTable(this.tablesEl, this.tables, ctx);
 		else if (this.mode === "edges") renderEdgesTable(this.tablesEl, this.tables, ctx);
 		else renderGroupsTable(this.tablesEl, this.tables, ctx);
 		for (const [el, top] of scrolled) el.scrollTop = top;
-		const scroller = this.tablesEl.querySelector(".bases-relations-graph-table-scroll");
-		if (scroller) scroller.scrollLeft = left;
 	}
 
 	// ---------- Дії з вузлами ----------

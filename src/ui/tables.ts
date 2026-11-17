@@ -134,45 +134,73 @@ function conditionCell(td: HTMLElement, ctx: TablesContext, title: string, value
 	}).open();
 }
 
-/** Спільні колонки: порядок, увімкнення, назва. */
-function rowControls<T extends { enabled: boolean; name: string; id: string }>(
-	tr: HTMLElement, rows: T[], i: number, ctx: TablesContext,
-): void {
+const P = "bases-relations-graph";
+
+/**
+ * Картка правила замість рядка таблиці: заголовок (порядок, увімкнення, назва, видалення)
+ * і тіло з полями, згрупованими за змістом. Групи полів переносяться під ширину панелі,
+ * тож горизонтальної прокрутки немає.
+ */
+function ruleCard<T extends { enabled: boolean; name: string; id: string }>(
+	list: HTMLElement, rows: T[], i: number, ctx: TablesContext, minRows = 1,
+): HTMLElement {
 	const r = rows[i];
-	const ord = tr.createEl("td", { cls: "bases-relations-graph-order" });
-	ord.createSpan({ text: String(i + 1) });
-	const up = ord.createEl("button", { cls: "clickable-icon", attr: { "aria-label": "Move up" } });
+	const card = list.createDiv({ cls: `${P}-rule` });
+	card.toggleClass("is-disabled", !r.enabled);
+	const head = card.createDiv({ cls: `${P}-rule-head` });
+
+	head.createSpan({ cls: `${P}-rule-num`, text: String(i + 1) });
+	const up = head.createEl("button", { cls: "clickable-icon", attr: { "aria-label": "Move up" } });
 	setIcon(up, "chevron-up");
 	up.disabled = i === 0;
 	up.onclick = () => { [rows[i - 1], rows[i]] = [rows[i], rows[i - 1]]; ctx.onChange(true); };
-	const down = ord.createEl("button", { cls: "clickable-icon", attr: { "aria-label": "Move down" } });
+	const down = head.createEl("button", { cls: "clickable-icon", attr: { "aria-label": "Move down" } });
 	setIcon(down, "chevron-down");
 	down.disabled = i === rows.length - 1;
 	down.onclick = () => { [rows[i + 1], rows[i]] = [rows[i], rows[i + 1]]; ctx.onChange(true); };
 
-	const en = tr.createEl("td").createEl("input", { type: "checkbox", attr: { "aria-label": "Enabled" } });
+	const en = head.createEl("input", { type: "checkbox", attr: { "aria-label": "Enabled" } });
 	en.checked = r.enabled;
-	en.onchange = () => { r.enabled = en.checked; ctx.onChange(false); };
+	en.onchange = () => {
+		r.enabled = en.checked;
+		card.toggleClass("is-disabled", !r.enabled);
+		ctx.onChange(false);
+	};
 
-	const name = tr.createEl("td").createEl("input", { type: "text", cls: "bases-relations-graph-name", attr: { placeholder: "name" } });
+	const name = head.createEl("input", { type: "text", cls: `${P}-rule-name`, attr: { placeholder: "Rule name" } });
 	name.value = r.name;
 	name.onchange = () => { r.name = name.value; ctx.onChange(false); };
-	if (ctx.errors.has(r.id)) {
-		tr.addClass("has-error");
-		name.title = "⚠ " + ctx.errors.get(r.id);
-	}
-}
 
-function deleteCell<T>(tr: HTMLElement, rows: T[], i: number, ctx: TablesContext, minRows = 1): void {
-	const del = tr.createEl("td").createEl("button", { cls: "clickable-icon", attr: { "aria-label": "Delete row" } });
+	const del = head.createEl("button", { cls: "clickable-icon", attr: { "aria-label": "Delete rule" } });
 	setIcon(del, "trash-2");
 	del.disabled = rows.length <= minRows;
 	del.onclick = () => { rows.splice(i, 1); ctx.onChange(true); };
+
+	const err = ctx.errors.get(r.id);
+	if (err) {
+		card.addClass("has-error");
+		card.createDiv({ cls: `${P}-rule-error`, text: "⚠ " + err });
+	}
+	return card.createDiv({ cls: `${P}-rule-body` });
 }
 
-function header(table: HTMLElement, cols: string[]): void {
-	const tr = table.createEl("thead").createEl("tr");
-	for (const c of cols) tr.createEl("th", { text: c });
+/** Група полів картки із заголовком. */
+function section(body: HTMLElement, title: string): HTMLElement {
+	const sec = body.createDiv({ cls: `${P}-section` });
+	sec.createDiv({ cls: `${P}-section-title`, text: title });
+	return sec.createDiv({ cls: `${P}-fields` });
+}
+
+/** Поле з підписом; повертає контейнер для елемента керування. */
+function field(sec: HTMLElement, label: string): HTMLElement {
+	const f = sec.createDiv({ cls: `${P}-field` });
+	f.createSpan({ cls: `${P}-field-label`, text: label });
+	return f.createDiv({ cls: `${P}-field-control` });
+}
+
+/** Список карток правил і кнопка додавання. */
+function ruleList(el: HTMLElement): HTMLElement {
+	return el.createDiv({ cls: `${P}-rules` });
 }
 
 const SHAPES: PickItem[] = [
@@ -192,22 +220,19 @@ const LABEL_MODES: PickItem[] = [
 	{ value: "tilted", label: "Along the link", icon: "lucide-trending-up" },
 ];
 
-/** Спільні колонки оформлення підпису: розмір, колір, фон. */
-function labelStyleCells(tr: HTMLElement, ctx: TablesContext, r: { labelSize?: number | null; labelColor?: string | null; labelBackground?: string | null }): void {
-	numberCell(tr.createEl("td"), r.labelSize ?? null, (v) => { r.labelSize = v; ctx.onChange(false); });
-	colorCell(tr.createEl("td"), r.labelColor ?? null, ctx.theme.text, (v) => { r.labelColor = v; ctx.onChange(false); });
-	colorCell(tr.createEl("td"), r.labelBackground ?? null, ctx.theme.background, (v) => { r.labelBackground = v; ctx.onChange(false); });
+/** Спільні поля оформлення підпису: розмір, колір, фон. */
+function labelStyleFields(sec: HTMLElement, ctx: TablesContext, r: { labelSize?: number | null; labelColor?: string | null; labelBackground?: string | null }, followGroup = false): void {
+	numberCell(field(sec, "Font size"), r.labelSize ?? null, (v) => { r.labelSize = v; ctx.onChange(false); });
+	colorCell(field(sec, "Font color"), r.labelColor ?? null, ctx.theme.text, (v) => { r.labelColor = v; ctx.onChange(false); }, false, followGroup ? GROUP_COLOR_AUTO : null);
+	colorCell(field(sec, "Background"), r.labelBackground ?? null, ctx.theme.background, (v) => { r.labelBackground = v; ctx.onChange(false); });
 }
 
 // ---------- Таблиця «Nodes» ----------
 
 export function renderNodesTable(el: HTMLElement, tables: GraphTables, ctx: TablesContext): void {
 	el.empty();
-	el.createDiv({ cls: "bases-relations-graph-hint", text: "Rows apply top to bottom: a later row overrides earlier ones in every field it sets. “—” means inherit. Each row describes one label; its index sets the place: 0 — node center, 1, 2… — above the node, −1, −2… — below it (empty = −1). Rows with the same index override each other, different indices add more labels." });
-	const scroll = el.createDiv({ cls: "bases-relations-graph-table-scroll" });
-	const table = scroll.createEl("table", { cls: "bases-relations-graph-table" });
-	header(table, ["#", "", "Name", "Condition", "Shape", "Color", "Stroke", "Stroke width", "Size by", "Size value", "Label", "Label index", "Font size", "Font color", "Label background", "Visibility", ""]);
-	const body = table.createEl("tbody");
+	el.createDiv({ cls: `${P}-hint`, text: "Rules apply top to bottom: a later rule overrides earlier ones in every field it sets; “—” means inherit. Each rule adds one label; its index sets the place: 0 — node center, 1, 2… — above the node, −1, −2… — below it (empty = −1)." });
+	const list = ruleList(el);
 	const rows = tables.nodes;
 	const sizeItems = (): PickItem[] => [
 		{ value: FIXED, label: "Fixed", icon: "lucide-ruler" },
@@ -216,23 +241,28 @@ export function renderNodesTable(el: HTMLElement, tables: GraphTables, ctx: Tabl
 	];
 
 	rows.forEach((r: NodeRule, i) => {
-		const tr = body.createEl("tr");
-		rowControls(tr, rows, i, ctx);
-		conditionCell(tr.createEl("td"), ctx, `Condition, row ${i + 1}`, r.condition, (v) => { r.condition = v; });
-		pickerCell(tr.createEl("td"), () => SHAPES, r.shape, true, (v) => { r.shape = v as NodeRule["shape"]; ctx.onChange(false); });
-		colorCell(tr.createEl("td"), r.color, ctx.theme.fill, (v) => { r.color = v; ctx.onChange(false); });
-		colorCell(tr.createEl("td"), r.strokeColor ?? null, ctx.theme.text, (v) => { r.strokeColor = v; ctx.onChange(false); });
-		numberCell(tr.createEl("td"), r.strokeWidth ?? null, (v) => { r.strokeWidth = v; ctx.onChange(false); });
-		pickerCell(tr.createEl("td"), sizeItems, r.sizeProperty, true, (v) => { r.sizeProperty = v; ctx.onChange(false); });
-		numberCell(tr.createEl("td"), r.sizeValue, (v) => { r.sizeValue = v; ctx.onChange(false); });
-		labelCell(tr.createEl("td"), ctx, r.label, (v) => { r.label = v; ctx.onChange(false); });
-		numberCell(tr.createEl("td"), r.labelIndex ?? null, (v) => { r.labelIndex = v === null ? null : Math.round(v); ctx.onChange(false); });
-		labelStyleCells(tr, ctx, r);
-		pickerCell(tr.createEl("td"), () => SHOW, r.show, true, (v) => { r.show = v as NodeRule["show"]; ctx.onChange(false); });
-		deleteCell(tr, rows, i, ctx);
+		const body = ruleCard(list, rows, i, ctx);
+
+		// Три групи по 4–5 полів, як у Links: рівні колонки без порожніх ділянок.
+		const notes = section(body, "Notes and size");
+		conditionCell(field(notes, "Condition"), ctx, `Condition, rule ${i + 1}`, r.condition, (v) => { r.condition = v; });
+		pickerCell(field(notes, "Visibility"), () => SHOW, r.show, true, (v) => { r.show = v as NodeRule["show"]; ctx.onChange(false); });
+		pickerCell(field(notes, "Size by"), sizeItems, r.sizeProperty, true, (v) => { r.sizeProperty = v; ctx.onChange(false); });
+		numberCell(field(notes, "Size value"), r.sizeValue, (v) => { r.sizeValue = v; ctx.onChange(false); });
+
+		const look = section(body, "Shape and color");
+		pickerCell(field(look, "Shape"), () => SHAPES, r.shape, true, (v) => { r.shape = v as NodeRule["shape"]; ctx.onChange(false); });
+		colorCell(field(look, "Color"), r.color, ctx.theme.fill, (v) => { r.color = v; ctx.onChange(false); });
+		colorCell(field(look, "Stroke"), r.strokeColor ?? null, ctx.theme.text, (v) => { r.strokeColor = v; ctx.onChange(false); });
+		numberCell(field(look, "Stroke width"), r.strokeWidth ?? null, (v) => { r.strokeWidth = v; ctx.onChange(false); });
+
+		const label = section(body, "Label");
+		labelCell(field(label, "Text"), ctx, r.label, (v) => { r.label = v; ctx.onChange(false); });
+		numberCell(field(label, "Index"), r.labelIndex ?? null, (v) => { r.labelIndex = v === null ? null : Math.round(v); ctx.onChange(false); });
+		labelStyleFields(label, ctx, r);
 	});
 
-	el.createEl("button", { text: "+ Add row", cls: "bases-relations-graph-add" }).onclick = () => {
+	el.createEl("button", { text: "+ Add rule", cls: `${P}-add` }).onclick = () => {
 		rows.push(emptyNodeRule());
 		ctx.onChange(true);
 	};
@@ -242,36 +272,37 @@ export function renderNodesTable(el: HTMLElement, tables: GraphTables, ctx: Tabl
 
 export function renderEdgesTable(el: HTMLElement, tables: GraphTables, ctx: TablesContext): void {
 	el.empty();
-	el.createDiv({ cls: "bases-relations-graph-hint", text: "Each row creates links. Source “Note” uses the note's own links; a property source turns the note into a connector that links the source value to the target values. Links not described here are not shown." });
-	const scroll = el.createDiv({ cls: "bases-relations-graph-table-scroll" });
-	const table = scroll.createEl("table", { cls: "bases-relations-graph-table" });
-	header(table, ["#", "", "Name", "Source", "Source value", "Target", "Target value", "Arrow to source", "Arrow to target", "Color", "Width by", "Width value", "Label", "Label mode", "Label position, %", "Font size", "Font color", "Label background", ""]);
-	const body = table.createEl("tbody");
+	el.createDiv({ cls: `${P}-hint`, text: "Each rule creates links. Source “Note” uses the note's own links; a property source turns the note into a connector that links the source value to the target values. Links not described here are not shown." });
+	const list = ruleList(el);
 	const rows = tables.edges;
 	const sourceItems = (): PickItem[] => [{ value: SOURCE_NOTE, label: "Note", icon: "lucide-file-text" }, ...propItems(ctx, true)];
 	const targetItems = (): PickItem[] => [{ value: TARGET_ALL_LINKS, label: "All outgoing links", icon: "lucide-link" }, ...propItems(ctx, true)];
 	const widthItems = (): PickItem[] => [{ value: FIXED, label: "Fixed", icon: "lucide-ruler" }, ...propItems(ctx)];
 
 	rows.forEach((r: EdgeRule, i) => {
-		const tr = body.createEl("tr");
-		rowControls(tr, rows, i, ctx);
-		pickerCell(tr.createEl("td"), sourceItems, r.source, false, (v) => { r.source = v ?? SOURCE_NOTE; ctx.onChange(false); });
-		conditionCell(tr.createEl("td"), ctx, `Source value, row ${i + 1}`, r.sourceValue, (v) => { r.sourceValue = v; });
-		pickerCell(tr.createEl("td"), targetItems, r.target, false, (v) => { r.target = v ?? TARGET_ALL_LINKS; ctx.onChange(false); });
-		conditionCell(tr.createEl("td"), ctx, `Target value, row ${i + 1}`, r.targetValue, (v) => { r.targetValue = v; });
-		selectCell(tr.createEl("td"), ARROW, r.arrowToSource === null ? null : String(r.arrowToSource), true, (v) => { r.arrowToSource = v === null ? null : v === "true"; ctx.onChange(false); });
-		selectCell(tr.createEl("td"), ARROW, r.arrowToTarget === null ? null : String(r.arrowToTarget), true, (v) => { r.arrowToTarget = v === null ? null : v === "true"; ctx.onChange(false); });
-		colorCell(tr.createEl("td"), r.color, ctx.theme.line, (v) => { r.color = v; ctx.onChange(false); });
-		pickerCell(tr.createEl("td"), widthItems, r.widthProperty, true, (v) => { r.widthProperty = v; ctx.onChange(false); });
-		numberCell(tr.createEl("td"), r.widthValue, (v) => { r.widthValue = v; ctx.onChange(false); });
-		labelCell(tr.createEl("td"), ctx, r.label, (v) => { r.label = v; ctx.onChange(false); });
-		pickerCell(tr.createEl("td"), () => LABEL_MODES, r.labelMode ?? null, true, (v) => { r.labelMode = v as EdgeRule["labelMode"]; ctx.onChange(false); });
-		numberCell(tr.createEl("td"), r.labelPosition ?? null, (v) => { r.labelPosition = v === null ? null : Math.max(0, Math.min(100, v)); ctx.onChange(false); });
-		labelStyleCells(tr, ctx, r);
-		deleteCell(tr, rows, i, ctx);
+		const body = ruleCard(list, rows, i, ctx);
+
+		const conn = section(body, "Connection");
+		pickerCell(field(conn, "Source"), sourceItems, r.source, false, (v) => { r.source = v ?? SOURCE_NOTE; ctx.onChange(false); });
+		conditionCell(field(conn, "Source value"), ctx, `Source value, rule ${i + 1}`, r.sourceValue, (v) => { r.sourceValue = v; });
+		pickerCell(field(conn, "Target"), targetItems, r.target, false, (v) => { r.target = v ?? TARGET_ALL_LINKS; ctx.onChange(false); });
+		conditionCell(field(conn, "Target value"), ctx, `Target value, rule ${i + 1}`, r.targetValue, (v) => { r.targetValue = v; });
+
+		const line = section(body, "Line");
+		selectCell(field(line, "Arrow to source"), ARROW, r.arrowToSource === null ? null : String(r.arrowToSource), true, (v) => { r.arrowToSource = v === null ? null : v === "true"; ctx.onChange(false); });
+		selectCell(field(line, "Arrow to target"), ARROW, r.arrowToTarget === null ? null : String(r.arrowToTarget), true, (v) => { r.arrowToTarget = v === null ? null : v === "true"; ctx.onChange(false); });
+		colorCell(field(line, "Color"), r.color, ctx.theme.line, (v) => { r.color = v; ctx.onChange(false); });
+		pickerCell(field(line, "Width by"), widthItems, r.widthProperty, true, (v) => { r.widthProperty = v; ctx.onChange(false); });
+		numberCell(field(line, "Width"), r.widthValue, (v) => { r.widthValue = v; ctx.onChange(false); });
+
+		const label = section(body, "Label");
+		labelCell(field(label, "Text"), ctx, r.label, (v) => { r.label = v; ctx.onChange(false); });
+		pickerCell(field(label, "Mode"), () => LABEL_MODES, r.labelMode ?? null, true, (v) => { r.labelMode = v as EdgeRule["labelMode"]; ctx.onChange(false); });
+		numberCell(field(label, "Position, %"), r.labelPosition ?? null, (v) => { r.labelPosition = v === null ? null : Math.max(0, Math.min(100, v)); ctx.onChange(false); });
+		labelStyleFields(label, ctx, r);
 	});
 
-	el.createEl("button", { text: "+ Add row", cls: "bases-relations-graph-add" }).onclick = () => {
+	el.createEl("button", { text: "+ Add rule", cls: `${P}-add` }).onclick = () => {
 		rows.push(emptyEdgeRule());
 		ctx.onChange(true);
 	};
@@ -352,29 +383,24 @@ function groupLabelCell(td: HTMLElement, ctx: TablesContext, value: GroupLabel |
 
 export function renderGroupsTable(el: HTMLElement, tables: GraphTables, ctx: TablesContext): void {
 	el.empty();
-	el.createDiv({ cls: "bases-relations-graph-hint", text: "Each row groups nodes by a property, like Group by in Bases: every distinct value becomes its own outlined group; nodes without a value stay ungrouped. A node can belong to groups from several rows. In the force layout groups pull their members together and push other nodes out." });
+	el.createDiv({ cls: `${P}-hint`, text: "Each rule groups nodes by a property, like Group by in Bases: every distinct value becomes its own outlined group; nodes without a value stay ungrouped. A node can belong to groups from several rules. In the force layout groups pull their members together and push other nodes out." });
 	if (!tables.groups) tables.groups = [];
 	const rows = tables.groups;
-	if (rows.length) {
-		const scroll = el.createDiv({ cls: "bases-relations-graph-table-scroll" });
-		const table = scroll.createEl("table", { cls: "bases-relations-graph-table" });
-		header(table, ["#", "", "Name", "Group by", "Order", "Color", "Label", "Font size", "Font color", "Label background", ""]);
-		const body = table.createEl("tbody");
-		rows.forEach((r: GroupRule, i) => {
-			const tr = body.createEl("tr");
-			rowControls(tr, rows, i, ctx);
-			createPicker(tr.createEl("td"), () => propItems(ctx), r.groupBy ?? null, { placeholder: "Select property" }, (v) => { r.groupBy = v; ctx.onChange(false); });
-			orderCell(tr.createEl("td"), ctx, r, i);
-			// Порожній колір — окремий колір палітри для кожної групи рядка.
-			colorCell(tr.createEl("td"), r.color, paletteColor(i), (v) => { r.color = v; ctx.onChange(false); }, true);
-			groupLabelCell(tr.createEl("td"), ctx, r.label, (v) => { r.label = v; ctx.onChange(false); });
-			numberCell(tr.createEl("td"), r.labelSize ?? null, (v) => { r.labelSize = v; ctx.onChange(false); });
-			colorCell(tr.createEl("td"), r.labelColor ?? null, ctx.theme.text, (v) => { r.labelColor = v; ctx.onChange(false); }, false, GROUP_COLOR_AUTO);
-			colorCell(tr.createEl("td"), r.labelBackground ?? null, ctx.theme.background, (v) => { r.labelBackground = v; ctx.onChange(false); });
-			deleteCell(tr, rows, i, ctx, 0);
-		});
-	}
-	el.createEl("button", { text: "+ Add group", cls: "bases-relations-graph-add" }).onclick = () => {
+	const list = ruleList(el);
+	rows.forEach((r: GroupRule, i) => {
+		const body = ruleCard(list, rows, i, ctx, 0);
+
+		const grouping = section(body, "Grouping");
+		createPicker(field(grouping, "Group by"), () => propItems(ctx), r.groupBy ?? null, { placeholder: "Select property" }, (v) => { r.groupBy = v; ctx.onChange(false); });
+		orderCell(field(grouping, "Order"), ctx, r, i);
+		// Порожній колір — окремий колір палітри для кожної групи рядка.
+		colorCell(field(grouping, "Color"), r.color, paletteColor(i), (v) => { r.color = v; ctx.onChange(false); }, true);
+
+		const label = section(body, "Label");
+		groupLabelCell(field(label, "Text"), ctx, r.label, (v) => { r.label = v; ctx.onChange(false); });
+		labelStyleFields(label, ctx, r, true);
+	});
+	el.createEl("button", { text: "+ Add group", cls: `${P}-add` }).onclick = () => {
 		rows.push(emptyGroupRule());
 		ctx.onChange(true);
 	};
