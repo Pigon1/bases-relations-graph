@@ -143,6 +143,8 @@ export function buildGraph(
 
 	for (const rule of tables.edges) {
 		if (!rule.enabled) continue;
+		const noteCond = ev.filter(rule.condition ?? null);
+		if (noteCond.error) errors.set(rule.id, "Condition: " + noteCond.error);
 		const srcCond = ev.filter(rule.sourceValue);
 		const tgtCond = ev.filter(rule.targetValue);
 		if (srcCond.error) errors.set(rule.id, "Source: " + srcCond.error);
@@ -150,6 +152,7 @@ export function buildGraph(
 		const passes = memoTest(byPath);
 
 		for (const e of entries) {
+			if (!noteCond.test(e)) continue;
 			const fromNote = rule.source === SOURCE_NOTE;
 			const sources = fromNote ? [e.file.path] : unique(linkedPaths(getValue(e, rule.source)));
 			if (!sources.length) continue;

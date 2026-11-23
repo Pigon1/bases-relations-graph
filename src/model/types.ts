@@ -58,6 +58,8 @@ export interface EdgeRule {
 	id: string;
 	name: string;
 	enabled: boolean;
+	/** Умова на нотатку, що створює зв'язок: з'єднувач або нотатку з посиланням. */
+	condition?: FilterTree | null;
 	source: string;
 	sourceValue: FilterTree | null;
 	target: string;
@@ -287,7 +289,7 @@ export function emptyNodeRule(): NodeRule {
 export function emptyEdgeRule(): EdgeRule {
 	return {
 		id: newId("e"), name: "", enabled: true,
-		source: SOURCE_NOTE, sourceValue: null, target: TARGET_ALL_LINKS, targetValue: null,
+		condition: null, source: SOURCE_NOTE, sourceValue: null, target: TARGET_ALL_LINKS, targetValue: null,
 		arrowToSource: null, arrowToTarget: null, color: null, widthProperty: null, widthValue: null,
 		label: null, labelMode: null, labelPosition: null, labelSize: null, labelColor: null, labelBackground: null,
 	};

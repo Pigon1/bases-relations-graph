@@ -283,6 +283,7 @@ export function renderEdgesTable(el: HTMLElement, tables: GraphTables, ctx: Tabl
 		const body = ruleCard(list, rows, i, ctx);
 
 		const conn = section(body, "Connection");
+		conditionCell(field(conn, "Condition"), ctx, `Condition, rule ${i + 1}`, r.condition ?? null, (v) => { r.condition = v; });
 		pickerCell(field(conn, "Source"), sourceItems, r.source, false, (v) => { r.source = v ?? SOURCE_NOTE; ctx.onChange(false); });
 		conditionCell(field(conn, "Source value"), ctx, `Source value, rule ${i + 1}`, r.sourceValue, (v) => { r.sourceValue = v; });
 		pickerCell(field(conn, "Target"), targetItems, r.target, false, (v) => { r.target = v ?? TARGET_ALL_LINKS; ctx.onChange(false); });

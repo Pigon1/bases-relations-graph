@@ -139,6 +139,7 @@ views:
       - id: elinks
         name: Links
         enabled: true
+        condition:
         source: "@note"
         sourceValue:
         target: "@links"
@@ -158,6 +159,7 @@ views:
       - id: erelations
         name: Relations
         enabled: true
+        condition:
         source: note.subjects
         sourceValue:
         target: note.objects
@@ -174,6 +176,27 @@ views:
         labelPosition: 50
         labelSize: 11
         labelColor: rgba(200, 110, 50, 1)
+        labelBackground:
+      - id: e1q61xu3
+        name: Married
+        enabled: true
+        condition:
+          and:
+            - note.relations == "married"
+        source: note.subjects
+        sourceValue:
+        target: note.objects
+        targetValue:
+        arrowToSource:
+        arrowToTarget:
+        color: rgba(209, 49, 211, 1)
+        widthProperty:
+        widthValue:
+        label:
+        labelMode:
+        labelPosition:
+        labelSize:
+        labelColor: rgba(209, 49, 211, 1)
         labelBackground:
     groups:
       - id: gcircles

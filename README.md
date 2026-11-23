@@ -92,6 +92,7 @@ The **Nodes**, **Links** and **Groups** tables are edited inside the view and sa
 
 ### Links
 
+- **Condition** — which notes create links with this row: the connector note itself, or the note that contains the link. Use it to style links by the connector's own properties.
 - **Source** — the note itself, or a link property of a connector note.
 - **Target** — all outgoing links of the note, or a link property.
 - **Source value / Target value** — optional conditions on the notes at either end.
@@ -99,6 +100,14 @@ The **Nodes**, **Links** and **Groups** tables are edited inside the view and sa
 - **Label** — a property or text; **Label mode** horizontal or along the link; **Label position** in percent from source to target. At 0% and 100% the label touches the node (or the arrow) instead of overlapping it.
 
 Links not described by any row are not drawn.
+
+Several rows that produce the same link are combined like node rows. For example, keep the *Connector notes* row and add rows with only a condition and a style:
+
+| Condition | Style |
+|---|---|
+| `kind == "friend"` | Color: green |
+| `kind == "colleague"` | Color: blue |
+| `direction == "both"` | Arrow to source: on |
 
 ### Conditions
 
